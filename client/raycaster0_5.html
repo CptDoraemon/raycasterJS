@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<head>
+<title>cs_assaut by Raycaster</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<link href="https://fonts.googleapis.com/css?family=VT323" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Ubuntu" rel="stylesheet">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/solid.css" integrity="sha384-r/k8YTFqmlOaqRkZuSiE9trsrDXkh07mRaoGBMoDcmA58OHILZPsk29i2BsFng1B" crossorigin="anonymous">
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/fontawesome.css" integrity="sha384-4aon80D8rXCGx9ayDt85LbyUHeMWd3UiBaWliBlJ53yzm9hqN21A+o1pqoyK04h+" crossorigin="anonymous">
+<style>
+body {
+	width: 100vw;
+	max-width: 100%;
+	height: 100vh;
+	margin: 0;
+	overflow: hidden;
+	font-family: 'Ubuntu', sans-serif;
+}
+.loading-wrapper {
+	width: 300px;
+	height: 200px;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	position: fixed;
+	top: 55%;
+	left: calc(50% - 150px);
+	z-index: 11;
+	color: black;
+	transition: color 0.5s;
+}
+.loading-wrapper p {
+	font-size: 32px;
+	font-weight: bold;
+	color: inherit;
+}
+.white-text {
+	color: white !important;
+}
+#loadingCanvas {
+	z-index: 10;
+	position: fixed;
+	top: 0;
+	left: 0;
+}
+#instructionComponent {
+	color: rgb(0,255,0); 
+	background-color: rgba(0,0,0,0.8);
+	opacity: 1;
+	font-family: 'VT323', monospace;
+	font-size: 24px; 
+	position: fixed;
+	z-index: 10;
+	top: 0;
+	left: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	width: 60%;
+	margin: 10%;
+	padding: 2% 10%;
+	transition: 0.3s;
+}
+#instructionComponent h1 {
+	font-size: 48px; 
+	margin: 20px;
+}
+#instructionComponent ul {
+	list-style: none;
+	margin: 0;
+}
+#toolBarComponent {
+	position: fixed;
+	top: 50px;
+	right: 50px;
+	z-index: 10;
+	width: 100px;
+	height: 50px;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+}
+#info, #setting {
+	position: relative;
+}
+#info span, #setting span {
+	font-size: 24px;
+	color: rgb(255, 255, 255);
+	transition: 0.3s;
+	cursor: pointer;
+	opacity: 0.5;
+}
+#info:hover::after, #setting:hover::after {
+	width: 100%;
+	position: absolute;
+	top: -100%;
+	left: -100%;
+	font-size: 18px;
+	color: white;
+	font-weight: bold;
+}
+#info:hover::after {
+	content: 'Instructions';
+}
+#setting:hover::after {
+	content: 'Settings';
+}
+#settingDropdown {
+	position: absolute;
+	opacity: 0;
+	visibility: hidden;
+	right: -10px;
+	top: 150%;
+	width: 300px;
+	background-color: white;
+	border-radius: 5px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+}
+#settingDropdown::after {
+	content: '';
+	position: absolute;
+	width: 10px;
+	height: 10px;
+	top: -5px;
+	right: 16px;
+	background-color: white;
+	transform: rotate(45deg);
+}
+#settingDropdown span {
+	color: black;
+	font-weight: bold;
+	font-size: 14px;
+	opacity: 1;
+}
+#settingDropdown i {
+	margin-left: 10px;
+}
+#info span:hover, #setting span:hover {
+	opacity: 1;
+	transition: 0.3s;
+}
+#settingDropdownItem1 {
+	height: 50px;
+	line-height: 50px;
+	width: calc(100% - 20px);
+	margin: 10px;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+}
+#settingDropdownItem1:hover {
+	background-color: rgba(100,100,100,0.1);
+	cursor: pointer;
+}
+a{
+	text-decoration: none;
+	display: block;
+	padding: 0 5%;  
+}
+a:link, a:visited, a:hover, a:active{
+	text-decoration: none;
+	color: rgb(0,255,0);
+}
+</style>
+</head>
+<body>
+<div id='root'></div>
+<script>
+(function() {
+	GlobalVar = function() {
+		// global variables
+	};
+	const 
+		width = window.innerWidth,
+		height = window.innerHeight,
+		assetsUrlObj = {
+			sky: './assets/sky.jpg'
+			//wall: 'https://s3.us-east-2.amazonaws.com/xiaoxihome/webprojects/raycasterAssets/wall.jpg'
+		};
+	GlobalVar.prototype.getWindowWidth = function() {
+		return width
+	};
+	GlobalVar.prototype.getWindowHeight = function(){
+		return height
+	};
+	GlobalVar.prototype.getAssetsUrlObj = function(){
+		return assetsUrlObj
+	}
+})();
+const CONST = new GlobalVar();
+
+(function() {
+	// parameters
+	Param = function() {
+		this.resolution /* it will be divided by window width */ = 1;
+		this.resolutionHigh = 1;
+		this.resolutionLow = 5;
+	};
+	const mapGrid = 
+	[
+		[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+		[1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+		[1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+		[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+		[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]   
+	];
+
+	const wallColorArray /* [wallType][HitDirection] */= [
+			['rgb(75,43,24)', 'rgb(139,79,45)'],
+			['rgb(255,255,255)', 'rgb(200,200,200)']
+		];
+
+	const
+		initialJumpVelocity /* maximum jump height */ = CONST.getWindowHeight() * 0.01,
+		gravity = initialJumpVelocity / 10;
+
+	// miniMap size
+	const
+		width = CONST.getWindowWidth(),
+		height = CONST.getWindowHeight(),
+		whicheverIsShorter = Math.min(width, height),
+		miniMapMargin = whicheverIsShorter * 0.01,
+		miniMapSizeMin = Math.floor(whicheverIsShorter * 0.2),
+		miniMapSizeMax = Math.floor(whicheverIsShorter * 0.8),
+		miniMapToggleSpeed = (miniMapSizeMax - miniMapSizeMin) / 5;
+
+	Param.prototype.getMiniMapMargin = function() {
+		return miniMapMargin
+	};
+	Param.prototype.getMiniMapSizeMin = function() {
+		return miniMapSizeMin
+	};
+	Param.prototype.getMiniMapSizeMax = function() {
+		return miniMapSizeMax
+	};
+	Param.prototype.getMiniMapToggleSpeed = function() {
+		return miniMapToggleSpeed
+	};
+	//
+	Param.prototype.getMapGrid = function() {
+		return mapGrid
+	};
+	Param.prototype.getWallColorArray = function() {
+		return wallColorArray
+	};
+	Param.prototype.getInitialJumpVelocity = function() {
+		return initialJumpVelocity
+	};
+	Param.prototype.getGravity = function() {
+		return gravity
+	}
+})();
+
+
+function State() {
+	// states
+	this.currentJumpVelocity = 0;
+	this.isTogglingMiniMap /* 1: enlarging, 0: false, -1: shrinking */ = 0;
+}
+
+// init objects
+const 
+	param = new Param(),
+	state = new State(),
+	game = new Game();
+
+function Player() {
+	this.x /* init coordinate x */ = 5;
+	this.y /* init coordinate y */ = Math.floor(10 + Math.random() * 20);
+	this.alpha /* init direction angle */ = Math.random() > 0.5 ? 0.75 * Math.PI * 2 : this.alpha = 0.25 * Math.PI * 2;
+	this.forward = false;
+	this.backward = false;
+	this.clockwise = false;
+	this.counterClockwise = false;
+	this.moveSpeed = 0.06;
+	this.rotateSpeed = 0.02;
+	this.mapGrid = param.getMapGrid();
+}
+Player.prototype.move = function() {
+	let moveState = this.forward ? 1 : this.backward ? -1 : 0;
+	let rotateState = this.clockwise ? 1 : this.counterClockwise ? -1 : 0;
+
+	if (moveState) {
+		const nextX = this.x + this.moveSpeed * Math.cos(this.alpha) * moveState;
+		const nextY = this.y + this.moveSpeed * Math.sin(this.alpha) * moveState;
+		if (this.mapGrid[Math.floor(this.y)][Math.floor(nextX)] === 0) {
+			this.x = nextX;
+		}
+		if (this.mapGrid[Math.floor(nextY)][Math.floor(this.x)] === 0) {
+			this.y = nextY;
+		}
+	}
+
+	if (rotateState) {
+		this.alpha = this.rotateSpeed * rotateState + this.alpha;
+	}
+}
+function Game() {
+	this.mainPlayer;
+	//
+	this.wallDistArray;
+	this.hitWallTypeArray;
+	this.hitDirectionArray;
+	this.rayAngleArray;
+	this.wallDistArrayBeforeFishEyeCorrection; // for drawing ray on minimap
+	this.fov = Math.PI / 3; //60 degree
+	// get vars from param
+	this.mapGrid = param.getMapGrid();
+	// related to jump function
+	this.gravity = param.getGravity();
+	this.accumulatedJumpHeight = 0;
+	//
+	this.miniMapSizeMax = param.getMiniMapSizeMax();
+	this.miniMapSizeMin = param.getMiniMapSizeMin();
+	this.miniMapSize = this.miniMapSizeMin;
+	this.miniMapMargin = param.getMiniMapMargin();
+	this.miniMapToggleSpeed = param.getMiniMapToggleSpeed();
+}
+Game.prototype.initiateCanvas = function() {
+	const rootDiv = document.getElementById('root');
+	const container = document.createElement('div');
+	rootDiv.appendChild(container);
+	const width = CONST.getWindowWidth();
+	const height = CONST.getWindowHeight();
+
+	const mainCanvas = `<canvas id="mainCanvas" width=${width} height=${height}>Your Browser Does Not Support Html5 Canvas</canvas>`;
+	container.innerHTML = mainCanvas;
+
+	// instructionComponent
+	const instructionComponent = new InstructionComponent();
+	instructionComponent.mountComponent();
+	// toolbar
+	const toolBarComponent = new ToolBarComponent();
+	toolBarComponent.mountComponent();
+
+}
+Game.prototype.createPlayers = function() {
+	this.mainPlayer = new Player();
+}
+Game.prototype.ray = function() {
+	//Prepare rayArray
+	const 
+		rayAngleArray = [],
+		raydistArray = [],
+		raydistArrayFishEyeCorrected = [],
+		hitDirectionArray = [],
+		hitWallTypeArray = [],
+		mapGrid = this.mapGrid,
+		width = CONST.getWindowWidth(),
+		resolution = param.resolution,
+		dAlpha /* angle difference between rays */ = (this.fov / (width / resolution));
+	let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * this.fov;
+	//
+	for (let i = 0; i < width; i+=resolution) {
+		rayAngleArray.push(rayAngle);
+		rayAngle += dAlpha;
+	}
+	//
+	rayAngleArray.map((i, index) => {
+		const 
+			result = raycaster(this.mainPlayer.x, this.mainPlayer.y, rayAngleArray[index]),
+			dist = result[0],
+			hitDirection = result[1],
+			hitWallType = result[2],
+			fishEyeCorrection = Math.abs(Math.cos(rayAngleArray[index] - this.mainPlayer.alpha));
+
+		raydistArray.push(dist);
+		raydistArrayFishEyeCorrected.push(dist * fishEyeCorrection);
+		hitDirectionArray.push(hitDirection);
+		hitWallTypeArray.push(hitWallType);
+	})
+	// update arrays in properties
+	this.wallDistArrayBeforeFishEyeCorrection = raydistArray;
+	this.wallDistArray = raydistArrayFishEyeCorrected;
+	this.hitWallTypeArray = hitWallTypeArray;
+	this.hitDirectionArray = hitDirectionArray;
+	this.rayAngleArray = rayAngleArray;
+
+	// raycaster
+	function raycaster(x, y, alpha) {
+		//input origin x,y and angle alpha, return distance.
+		function checkHit (x, y) {
+			// hit if grid value is not 0
+			return mapGrid[y][x] !== 0
+		}
+		const 
+			sin = Math.sin(alpha),
+			cos = Math.cos(alpha),
+			tan = Math.tan(alpha),
+			result = [];
+		// temp variables used for calculation
+		let vx, vy, hx, hy, dist, distV, distH, hitDirection /* 0: horizontal, 1:vertical */, hitWallType;
+
+		//2 tan>0 x++ y++
+		if (sin >= 0 && cos > 0) {
+			//vertical
+			vx = Math.ceil(x);
+			vy = Math.min(y + tan * (vx - x), 39);
+			while (!checkHit(Math.floor(vx),Math.floor(vy))) {
+				vx++;
+				vy = Math.min(vy + tan, 39);
+			}
+			//horizontal
+			hy = Math.ceil(y); //DO NOT REVERSE HY HX!
+			hx = x + (hy - y)/tan;
+			while (!checkHit(Math.floor(hx),Math.floor(hy))) {
+				hx += 1/tan;
+				hy++;
+			}
+			distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y), 0.5);
+			distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y), 0.5);
+			if (distV >= distH) {
+				dist = distH;
+				hitDirection = 0;
+				hitWallType = mapGrid[Math.floor(hy)][Math.floor(hx)];
+			} else {
+				dist = distV;
+				hitDirection = 1;
+				hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)];
+			}
+		}
+		
+		//4 tan<0 x-- y++
+		if (sin > 0 && cos <= 0) {
+			//vertical
+			vx = Math.floor(x);
+			vy = Math.min(y + tan * (vx - x), 39);
+			while (!checkHit(Math.floor(vx)-1,Math.floor(vy))) {
+				vx--;
+				vy = Math.min(vy - tan, 39);
+			}
+			//horizontal
+			hy = Math.ceil(y); //DO NOT REVERSE HY HX!
+			hx = x + (hy - y)/tan;
+			while (!checkHit(Math.floor(hx),Math.floor(hy))) {
+				hx += 1/tan;
+				hy++;
+			}
+			distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y),0.5);
+			distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y),0.5);
+			if (distV >= distH) {
+				dist = distH;
+				hitDirection = 0;
+				hitWallType = mapGrid[Math.floor(hy)][Math.floor(hx)];
+			} else {
+				dist = distV;
+				hitDirection = 1;
+				hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)-1];
+			}
+		}
+		
+		//6 tan>0 x-- y--
+		if (sin <= 0 && cos < 0) {
+			//vertical
+			vx = Math.floor(x);
+			vy = Math.max(y + tan * (vx - x), 1);
+			while (!checkHit(Math.floor(vx)-1,Math.floor(vy))) {
+				vx--;
+				vy = Math.max(vy - tan, 1);
+			}
+			//horizontal
+			hy = Math.floor(y); //DO NOT REVERSE HY HX!
+			hx = x + (hy - y)/tan;
+			while (!checkHit(Math.floor(hx),Math.floor(hy)-1)) {
+				hx -= 1/tan;
+				hy--;
+			}
+			distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y),0.5);
+			distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y),0.5);
+			if (distV >= distH) {
+				dist = distH;
+				hitDirection = 0;
+				hitWallType = mapGrid[Math.floor(hy)-1][Math.floor(hx)];
+			} else {
+				dist = distV;
+				hitDirection = 1;
+				hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)-1];
+			}
+		}
+		
+		//8 tan<0 x++ y--
+		if (sin < 0 && cos >= 0) {
+			//vertical
+			vx = Math.ceil(x);
+			vy = Math.max(y + tan * (vx - x), 1);
+			while (!checkHit(Math.floor(vx),Math.floor(vy))) {
+				vx++;
+				vy = Math.max(vy + tan, 1);
+			}
+			//horizontal
+			hy = Math.floor(y); //DO NOT REVERSE HY HX!
+			hx = x + (hy - y)/tan;
+			while (!checkHit(Math.floor(hx),Math.floor(hy)-1)) {
+				hx -= 1/tan;
+				hy--;
+			}
+			distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y),0.5);
+			distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y),0.5);
+			if (distV >= distH) {
+				dist = distH;
+				hitDirection = 0;
+				hitWallType = mapGrid[Math.floor(hy)-1][Math.floor(hx)];
+			} else {
+				dist = distV;
+				hitDirection = 1;
+				hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)];
+			}
+		}
+		
+		//
+		result.push(dist);
+		result.push(hitDirection);
+		result.push(hitWallType);
+		return result;
+	}
+}
+Game.prototype.drawFrame = function() {
+	const 
+		width = CONST.getWindowWidth(),
+		height = CONST.getWindowHeight(),
+		ctx = document.getElementById('mainCanvas').getContext('2d');
+	ctx.clearRect(0, 0, width, height);
+
+//sky
+	const
+		sky = document.getElementById("sky"),
+		skyWidth = sky.width,
+		skyHeight = sky.height,
+		playerAlpha =  this.mainPlayer.alpha,
+		twoPI = Math.PI * 2,
+		cameraAngle = playerAlpha % twoPI,
+		direction = cameraAngle > 0 ?
+			cameraAngle / twoPI :
+			(twoPI + cameraAngle) / twoPI;
+
+	ctx.drawImage(sky, direction*skyWidth, 0, 0.25*skyWidth, skyHeight, 0, 0, width, 0.6*height);
+	if (direction >= 0.75) {
+		ctx.drawImage(sky, 0, 0, 0.25*skyWidth, skyHeight, (1-direction)/0.25*width, 0, width, 0.6*height);
+	}
+
+//jump
+	let currentJumpVelocity = state.currentJumpVelocity;
+	const 
+		gravity = this.gravity,
+		jumpHiehtInThisFrame /* vt, t=1 here */ = currentJumpVelocity,
+		accumulatedJumpHeightAfterThisJump = this.accumulatedJumpHeight + jumpHiehtInThisFrame;
+	
+	if (accumulatedJumpHeightAfterThisJump > 0) {
+		// still jumping
+		state.currentJumpVelocity = currentJumpVelocity - gravity;
+		this.accumulatedJumpHeight += jumpHiehtInThisFrame;
+	} else {
+		// returned ground
+		state.currentJumpVelocity = 0;
+		this.accumulatedJumpHeight = 0;
+	}
+//floor
+	ctx.beginPath();
+	ctx.fillStyle = 'rgba(150,150,150,1)';
+	ctx.fillRect(0, 0.5 * height, width, 0.5 * height);
+	ctx.fill();
+//wall
+	const wallDistArray = this.wallDistArray.slice();
+	wallDistArray.map((i, index) => {
+		const 
+			columnHeightPercent = 3 / i,
+			halfWallHeight = 0.5 * columnHeightPercent * height,
+			mid = 0.5 * height,
+			wallStart = mid - halfWallHeight,
+			wallEnd = mid + halfWallHeight,
+			hitWallType = this.hitWallTypeArray[index],
+			hitDirection = this.hitDirectionArray[index],
+			resolution = param.resolution;
+
+		const wallColorArray = param.getWallColorArray();
+		const wallColor = wallColorArray[hitWallType - 1][hitDirection];
+		ctx.fillStyle = wallColor;
+		ctx.beginPath();
+		ctx.fillRect(index * resolution, wallStart + accumulatedJumpHeightAfterThisJump, resolution, wallEnd - wallStart);
+		ctx.fill();
+	})
+
+	//crosshair
+	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || this.mainPlayer.counterClockwise || this.mainPlayer.clockwise || state.currentJumpVelocity;
+	const crosshairSize = isMoving ? 15 : 0;
+
+	ctx.strokeStyle = "rgba(0,255,0,1)";
+	ctx.beginPath();
+	ctx.moveTo(0.5*width-20-crosshairSize,0.5*height);
+	ctx.lineTo(0.5*width-5-crosshairSize,0.5*height);
+	ctx.stroke();
+	ctx.beginPath();
+	ctx.moveTo(0.5*width+5+crosshairSize,0.5*height);
+	ctx.lineTo(0.5*width+20+crosshairSize,0.5*height);
+	ctx.stroke();
+	ctx.beginPath();
+	ctx.moveTo(0.5*width,0.5*height-20-crosshairSize);
+	ctx.lineTo(0.5*width,0.5*height-5-crosshairSize);
+	ctx.stroke();
+	ctx.beginPath();
+	ctx.moveTo(0.5*width,0.5*height+5+crosshairSize);
+	ctx.lineTo(0.5*width,0.5*height+20+crosshairSize);
+	ctx.stroke();
+
+	// Minimap
+	this.drawMinimap();
+}
+Game.prototype.drawMinimap = function() {
+	// variables
+	const 
+		ctx = document.getElementById('mainCanvas').getContext('2d'),
+		miniMapMargin /* eg: top =left = 10px */= this.miniMapMargin,
+		mapGrid = this.mapGrid.slice(),
+		mapGridSize /* it's a square */ = mapGrid.length,
+		miniMapSize /* it's a square */ = this.miniMapSize,
+	 	pixel /* unit pixel for one grid, eg: 200/40=5px */ = miniMapSize / mapGridSize,
+	 	rayAngleArray = this.rayAngleArray.slice(),
+	 	wallDistArray = this.wallDistArrayBeforeFishEyeCorrection.slice(),
+	 	playerXOnMinimap = this.mainPlayer.x * pixel + miniMapMargin,
+	 	playerYOnMinimap = this.mainPlayer.y * pixel + miniMapMargin,
+	 	isTogglingMiniMap /* 1: enlarging, 0: false, -1: shrinking */ = state.isTogglingMiniMap,
+		miniMapSizeInNextFrame = miniMapSize + isTogglingMiniMap * this.miniMapToggleSpeed;
+
+	// toggling minimap
+	if (isTogglingMiniMap) {
+		// indeed is toggling
+		if (miniMapSizeInNextFrame >= this.miniMapSizeMax || miniMapSizeInNextFrame <= this.miniMapSizeMin) {
+			// last frame
+			this.miniMapSize = isTogglingMiniMap === 1 ? this.miniMapSizeMax : this.miniMapSizeMin
+		} else {
+			this.miniMapSize = miniMapSizeInNextFrame
+		}
+	}
+
+	// wall
+	for (let y=0; y<mapGridSize; y++) {
+		for (let x=0; x<mapGridSize; x++){
+			if (mapGrid[y][x]) {
+				ctx.fillStyle = "rgba(0,150,0,0.5)";
+				ctx.fillRect(x * pixel + miniMapMargin, y * pixel + miniMapMargin, pixel, pixel);
+			}
+		}
+	}
+	// player
+	ctx.fillStyle = "red";
+	ctx.beginPath();
+	ctx.arc(playerXOnMinimap, playerYOnMinimap, miniMapSize / 100, 0 , 2 * Math.PI);
+	ctx.fill();
+	// rays
+	rayAngleArray.map((i, index) => {
+		const thisRayLength = wallDistArray[index];
+		ctx.strokeStyle = "rgba(0,255,0,0.01)";
+		ctx.beginPath();
+		ctx.moveTo(playerXOnMinimap, playerYOnMinimap);
+		ctx.lineTo(playerXOnMinimap + pixel * thisRayLength * Math.cos(i), playerYOnMinimap + pixel * thisRayLength * Math.sin(i));
+		ctx.stroke();
+	})
+	// direction pointer
+	ctx.strokeStyle = "black";
+	ctx.beginPath();
+	ctx.moveTo(playerXOnMinimap, playerYOnMinimap);
+	ctx.lineTo(playerXOnMinimap + pixel * Math.cos(this.mainPlayer.alpha), playerYOnMinimap + pixel * Math.sin(this.mainPlayer.alpha));
+	ctx.stroke();
+	// grid
+	for (let i = 0; i <= mapGridSize; i++) {
+		const 
+			start = i * pixel + miniMapMargin,
+			end = mapGridSize * pixel + miniMapMargin;
+		ctx.strokeStyle = "rgba(0,150,0,0.1)";
+		ctx.beginPath();
+		ctx.moveTo(miniMapMargin, start);
+		ctx.lineTo(end, start);
+		ctx.moveTo(start, miniMapMargin);
+		ctx.lineTo(start, end);
+		ctx.stroke();
+	}
+}
+Game.prototype.attachEventListeners = function() {
+	const player = this.mainPlayer;
+	document.addEventListener('keydown', function(e) {
+					switch(e.keyCode){
+						case 65:
+							player.counterClockwise = true;
+							break;
+						case 87:
+							player.forward = true;
+							break;
+						case 68:
+							player.clockwise = true;
+							break;
+						case 83:
+							player.backward = true;
+							break;
+						case 32:
+							if(!state.currentJumpVelocity) state.currentJumpVelocity = param.getInitialJumpVelocity();
+							break;
+						case 77:
+							const isTogglingMiniMap = state.isTogglingMiniMap;
+							state.isTogglingMiniMap = !isTogglingMiniMap ?
+														1 :
+														isTogglingMiniMap === 1 ?
+														-1 :
+														1;
+
+							break;
+					}
+})
+document.addEventListener('keyup', function(e) {
+					switch(e.keyCode){
+						case 65:
+							player.counterClockwise = false;
+							break;
+						case 87:
+							player.forward = false;
+							break;
+						case 68:
+							player.clockwise = false;
+							break;
+						case 83:
+							player.backward = false;
+							break;	
+					}
+})
+}
+Game.prototype.play = function() {
+	game.initiateCanvas();
+	game.createPlayers();
+	game.attachEventListeners();
+
+	const frame = () => {
+		this.mainPlayer.move();
+		this.ray();
+		this.drawFrame();
+		requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+}
+
+function Loading() {
+	this.loaded = 0;
+	this.total = 1;
+	this.isLoaded = false;
+}
+Loading.prototype.sendRequest = function() {
+	const urlObj = CONST.getAssetsUrlObj();
+
+	function appendImg(url, elId) {
+		const div = document.createElement('div');
+		div.style.display = 'none';
+		const img = document.createElement('img');
+		img.id = elId;
+		img.src = url;
+		div.appendChild(img);
+		document.getElementById('root').appendChild(div);
+	}
+	const loadImgThenAppendToDom = (url, elId) => {
+		const xml = new XMLHttpRequest();
+		xml.open('GET', url, true);
+		xml.onprogress = (e) => {
+			this.loaded = e.loaded;
+			this.total = e.total;
+		};
+		xml.onload = () => {
+			appendImg(url, elId);
+			this.isLoaded = true;
+		}
+		xml.send();
+	};
+
+	for (let key in urlObj) {
+		if (urlObj.hasOwnProperty(key)) {
+			loadImgThenAppendToDom(urlObj[key], key)
+		}
+	}
+}
+Loading.prototype.drawLoadingPage = function() {
+	const 
+		rootDiv = document.getElementById('root'),
+		width = CONST.getWindowWidth(),
+		height = CONST.getWindowHeight(),
+		centerX = 0.5 * width,
+		centerY = 0.5 * height,
+		radius = Math.pow(centerX * centerX + centerY * centerY, 0.5),
+		PI = Math.PI;
+		angleInOneFrame = PI * 2 / 120,
+		startingAngle = 0 - PI * 0.5,
+		loadingCanvas = `<canvas id="loadingCanvas" width=${width} height=${height}>Your Browser Does Not Support Html5 Canvas</canvas>`, 
+		loadingMessage = 
+			'<div class="loading-wrapper" id="loading-wrapper">' +
+				'<p>Loading <span id="loadingPercentage">0</span>%<p>' +
+			'</div>';
+	rootDiv.innerHTML = loadingCanvas + loadingMessage;
+	const 
+		ctx = document.getElementById('loadingCanvas').getContext('2d'),
+		wrapper = document.getElementById('loading-wrapper'),
+		loadingPercentageSpan = document.getElementById('loadingPercentage');
+
+	let 
+		endingAngle = startingAngle,
+		displayingPercentage = 0,
+		textColorChangedToWhite = false;
+	let frame = () => {
+		const 
+			loadingPercentage = Math.ceil((this.loaded / this.total) * 100),
+			canvasPercentage = 100 * ((endingAngle - startingAngle) / (PI * 2));
+
+		// update text
+		if (displayingPercentage + 1 <= loadingPercentage) {
+			displayingPercentage++;
+			loadingPercentageSpan.innerHTML = displayingPercentage;
+		}
+
+		// change text color to white once loaded > 50%
+		if (displayingPercentage > 50 && !textColorChangedToWhite) wrapper.className = 'loading-wrapper white-text';
+
+		// canvas animation
+		if (canvasPercentage < loadingPercentage) {
+			ctx.clearRect(0, 0, width, height);
+			ctx.beginPath();
+			ctx.fillStyle = 'rgb(0, 172, 237)';
+			ctx.moveTo(centerX, centerY)
+			ctx.arc(centerX, centerY, radius, startingAngle, endingAngle += angleInOneFrame);
+			ctx.fill();
+		}
+
+		if (canvasPercentage < 100 || !this.isLoaded) {
+			// if the true loading speed is slower (slow 3g) than canvas animation epr frame speed, finishloading will be called before img append to DOM, therefore check this.isLoaded
+			requestAnimationFrame(frame)
+		} else {
+			this.finishLoading()
+		}
+	}
+	requestAnimationFrame(frame);
+}
+Loading.prototype.finishLoading = function() {
+	game.play();
+	const 
+		loadingCanvas = document.getElementById('loadingCanvas'),
+		loadingText = document.getElementById('loading-wrapper');
+	loadingCanvas.style.transition = '2s';
+	loadingCanvas.style.transitionDelay = '0.5s';
+	loadingCanvas.style.opacity = '0';
+	loadingText.style.transition = '2s';
+	loadingText.style.transitionDelay = '0.5s';
+	loadingText.style.opacity = '0';
+
+	setTimeout(() => {
+		loadingCanvas.parentNode.removeChild(loadingCanvas);
+		loadingText.parentNode.removeChild(loadingText);
+	}, 3000);
+}
+
+function InstructionComponent() {
+	this.component;
+	this.isDisplaying = true;
+}
+InstructionComponent.prototype.mountComponent = function() {
+	const rootDiv = document.getElementById('root');
+	const instructionComponent = document.createElement('div');
+	instructionComponent.id = 'instructionComponent';
+	instructionComponent.innerHTML = 
+			'<h1>cs_assault.map</h1>' +
+				'<ul>' +
+					'<li>I: Open / close this window</li>' +
+					'<li>W: Move Forward</li>' +
+					'<li>S: Move Back</li>' +
+					'<li>A: Turn Left</li>' +
+					'<li>D: Turn Right</li>' +
+					'<li>Space: Jump</li>' +
+					'<li>M: Toggle Map Zooming</li>' +
+				'</ul>' +
+			'<h1>Many thanks to these tutorials:</h1>' +
+				'<ul>' +
+					'<li><a href="http://www.playfuljs.com/a-first-person-engine-in-265-lines/" target="_blank">PlayfulJS.com</a></li>' +
+					'<li><a href="http://permadi.com/1996/05/ray-casting-tutorial-table-of-contents/" target="_blank">Permadi.com</a></li>' +
+					'<li><a href="http://lodev.org/cgtutor/raycasting.html" target="_blank">Lodev.org</a></li>' +
+				'</ul>';
+	rootDiv.appendChild(instructionComponent);
+	this.component = instructionComponent;
+	this.addEventListener();
+	this.toggleDisplay();
+}
+InstructionComponent.prototype.addEventListener = function() {
+	document.addEventListener('keydown', (e) => {
+		if (e.keyCode === 73) {
+			// button I
+			this.toggleDisplay()
+		}
+	});
+}
+InstructionComponent.prototype.toggleDisplay = function() {
+	if (this.isDisplaying) {
+		this.component.style.opacity = 0;
+		this.component.style.visibility = 'hidden';
+	} else {
+		this.component.style.opacity = 1;
+		this.component.style.visibility = 'visible';
+	}
+	this.isDisplaying = !this.isDisplaying;
+}
+function ToolBarComponent() {
+	const createDiv = (id) => {
+		const div = document.createElement('div');
+		div.id = id;
+		return div;
+	}
+	const 
+		toolBarComponent = createDiv('toolBarComponent'),
+		info = createDiv('info'),
+		setting = createDiv('setting'),
+		settingDropdown = createDiv('settingDropdown');
+		settingDropdownItem1 = createDiv('settingDropdownItem1');
+	info.innerHTML = '<span><i class="fas fa-info-circle"></i></span>';
+	setting.innerHTML = '<span><i class="fas fa-cog"></i></span>';
+	const graphicToggleOn = () => {
+		settingDropdownItem1.innerHTML = '<span>Lower graphic quality <i class="fas fa-toggle-on" style="color: green; font-size: 24px; top: .125em; position: relative""></i></span>';
+		this.isLowerGraphicQuality = true;
+		param.resolution = param.resolutionLow;
+	}
+	const graphicToggleOff = () => {
+		settingDropdownItem1.innerHTML = '<span>Lower graphic quality <i class="fas fa-toggle-off" style="color: rgba(0,0,0,0.5); font-size: 24px; top: .125em; position: relative"></i></span>';
+		this.isLowerGraphicQuality = false;
+		param.resolution = param.resolutionHigh;
+	}
+	graphicToggleOff();
+
+	info.onclick = () => {
+		const event = new Event('keydown');
+		event.keyCode = 73;
+		document.dispatchEvent(event);
+	}
+	setting.onclick = () => {
+		this.isSettingDropdownActive ? this.closeSettingDropdown() : this.openSettingDropdown();
+	}
+	settingDropdownItem1.onclick = (e) => {
+		e.stopPropagation();
+		this.isLowerGraphicQuality ? graphicToggleOff() : graphicToggleOn();
+	}
+	settingDropdown.onmouseleave = () => {
+		this.closeSettingDropdown()
+	}
+
+	setting.appendChild(settingDropdown);
+	toolBarComponent.appendChild(info);
+	toolBarComponent.appendChild(setting);
+	settingDropdown.appendChild(settingDropdownItem1);
+
+	this.component = toolBarComponent;
+	this.settingDropdownComponent = settingDropdown;
+	this.isSettingDropdownActive = false;
+	this.isLowerGraphicQuality = false;
+}
+ToolBarComponent.prototype.mountComponent = function() {
+	const rootDiv = document.getElementById('root');
+	rootDiv.appendChild(this.component);
+}
+ToolBarComponent.prototype.closeSettingDropdown = function() {
+	if (this.isSettingDropdownActive) {
+		const dropdown = this.settingDropdownComponent;
+		dropdown.style.opacity = 0;
+		dropdown.style.visibility = 'hidden'
+		this.isSettingDropdownActive = false;
+	}
+}
+ToolBarComponent.prototype.openSettingDropdown = function() {
+	if (!this.isSettingDropdownActive) {
+		const dropdown = this.settingDropdownComponent;
+		dropdown.style.opacity = 1;
+		dropdown.style.visibility = 'visible'
+		this.isSettingDropdownActive = true;
+	}
+}
+
+
+
+window.onload = function() {
+	const loading = new Loading();
+	loading.sendRequest();
+	loading.drawLoadingPage();
+}
+
+
+
+</script>
+</body>
+</html>
