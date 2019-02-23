@@ -249,7 +249,7 @@ const CONST = new GlobalVar();
 	const wallColorArray /* [wallType][HitDirection] */= [
 			['rgb(75,43,24)', 'rgb(139,79,45)'],
 			['rgb(255,255,255)', 'rgb(200,200,200)'],
-			['rgb(0,0,0)', 'rgb(10,10,10)'],
+			['rgb(64, 224, 208)', 'rgb(36,127,118)'],
 		];
 
 	const
@@ -348,10 +348,7 @@ function Game() {
 	this.rayAngleArray;
 	this.wallDistArrayBeforeFishEyeCorrection; // for drawing ray on minimap
 	this.fov = Math.PI / 3; //60 degree
-	this.windowWidth = CONST.getWindowWidth();
-	this.windowHeight = CONST.getWindowHeight();
-	this.resolution = param.resolution;
-	this.dAlpha /* angle between rays */ = (this.fov / (this.windowWidth / this.resolution));
+	this.dAlpha; /* angle between rays */
 	// get vars from param
 	this.mapGrid = param.getMapGrid();
 	// related to jump function
@@ -394,12 +391,17 @@ Game.prototype.ray = function() {
 		raydistArrayFishEyeCorrected = [],
 		hitDirectionArray = [],
 		hitWallTypeArray = [],
-		mapGrid = this.mapGrid;
+		mapGrid = this.mapGrid,
+		width = CONST.getWindowWidth(),
+		height = CONST.getWindowHeight(),
+		resolution = param.resolution,
+		dAlpha = (this.fov / (width / resolution));
+	this.dAlpha = dAlpha;
 	let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * this.fov;
 	//
-	for (let i = 0; i < this.windowWidth; i += this.resolution) {
+	for (let i = 0; i < width; i += resolution) {
 		rayAngleArray.push(rayAngle);
-		rayAngle += this.dAlpha;
+		rayAngle += dAlpha;
 	}
 	//
 	rayAngleArray.map((i, index) => {
@@ -662,9 +664,37 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 		y2 = otherPlayer.y,
 		dx = x2 - x1,
 		dy = y2 - y1,
-		z = Math.pow(dx*dx + dy*dy, 0.5);
-		beta /* temp: a + b = 2pi */ = Math.asin(-dy / z);
-		anotherPlayersAngleToMainPlayer = Math.PI * 2 - beta;
+		z = Math.pow(dx*dx + dy*dy, 0.5),
+		twoPI = Math.PI * 2;
+		rayAngleArray = this.rayAngleArray.slice(),
+		width = CONST.getWindowWidth(),
+		height = CONST.getWindowHeight();
+	let anotherPlayersAngleToMainPlayer;
+	// dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
+	if (dx === 0 && dy === 0) {
+		anotherPlayersAngleToMainPlayer = 0;
+	} else if (dx === 0) {
+		if (dy > 0) {
+			anotherPlayersAngleToMainPlayer = 0.25 * twoPI
+		} else if (dy < 0) {
+			anotherPlayersAngleToMainPlayer = 0.75 * twoPI
+		}
+	} else if (dy === 0) {
+		if (dx > 0) {
+			anotherPlayersAngleToMainPlayer = 0
+		} else if (dx < 0){
+			anotherPlayersAngleToMainPlayer = 0.5 * twoPI
+		}
+	} else if (dx > 0 && dy > 0) {
+		anotherPlayersAngleToMainPlayer = Math.atan(dy / dx);
+	} else if (dx < 0 && dy > 0) {
+		anotherPlayersAngleToMainPlayer = twoPI * 0.5 - Math.atan(dy / -dx);
+	} else if (dx < 0 && dy < 0) {
+		anotherPlayersAngleToMainPlayer = Math.atan(-dy / -dx) + twoPI * 0.5;
+	} else if (dx > 0 && dy < 0) {
+		anotherPlayersAngleToMainPlayer = twoPI - Math.atan(-dy / dx);
+	} 
+	anotherPlayersAngleToMainPlayer = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer);
 
 	function remapAngleToZeroToTwoPI(angle) {
 		const twoPI = Math.PI * 2;
@@ -674,8 +704,9 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 	function checkIfAnotherPlayerIsInSight(sightStartAngle, sightEndAngle, fov, anotherPlayersAngleToMainPlayer) {
 		const end = remapAngleToZeroToTwoPI(sightEndAngle);
 		let start = remapAngleToZeroToTwoPI(sightStartAngle); 
+		//console.log(start * 360 / Math.PI / 2, end * 360 / Math.PI / 2, anotherPlayersAngleToMainPlayer* 360 / Math.PI / 2)
 		if (end < fov) {
-			if (start < anotherPlayersAngleToMainPlayer || anotherPlayersAngleToMainPlayer < end) {
+			if ((start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < Math.PI * 2) || (0 < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end)) {
 				return true
 			} else {
 				return false
@@ -691,34 +722,36 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 	const drawOtherPlayer = (otherPlayer, anotherPlayersAngleToMainPlayer) => {
 		const 
 			playerMaxWidth = 500,
-			playerMaxHeight = 500,
-			distance = z,
+			playerMaxHeight = 800,
+			distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
 			playerCurrentWidth = playerMaxWidth / z,
 			playerCurrentHeight = playerMaxHeight / z;
 
-		const end = remapAngleToZeroToTwoPI(this.rayAngleArray[this.rayAngleArray.length - 1]);
-		let start = remapAngleToZeroToTwoPI(this.rayAngleArray[0]); 
+		const end = remapAngleToZeroToTwoPI(rayAngleArray[rayAngleArray.length - 1]);
+		let start = remapAngleToZeroToTwoPI(rayAngleArray[0]); 
 		let player1PosOnScreen;
 
-		if (end < this.fov) {
-			start -= Math.PI * 2;
+		if (anotherPlayersAngleToMainPlayer < start) {
+			// this function is called when another player is garanteed in sight
+			anotherPlayersAngleToMainPlayer += Math.PI * 2
 		}
-		otherPlayerPosOnScreen = (anotherPlayersAngleToMainPlayer - start) / this.dAlpha;
-
-		const ctx = document.getElementById('mainCanvas').getContext('2d');
-		ctx.fillStyle = 'black';
-		ctx.beginPath();
-		ctx.fillRect(otherPlayerPosOnScreen - playerCurrentWidth / 2, (this.windowHeight - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth / 2, playerCurrentHeight);
-		ctx.fill();
+		otherPlayerPosOnScreen = Math.floor(((anotherPlayersAngleToMainPlayer - start) / this.dAlpha) * param.resolution);
+		const wallDistAtThisPos = this.wallDistArrayBeforeFishEyeCorrection[otherPlayerPosOnScreen];
+		if (z < wallDistAtThisPos) {
+			// check if another player is blocked by wall is HERE!!
+			const ctx = document.getElementById('mainCanvas').getContext('2d');
+			ctx.fillStyle = 'black';
+			ctx.beginPath();
+			ctx.fillRect(otherPlayerPosOnScreen - playerCurrentWidth / 2, (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth, playerCurrentHeight);
+			ctx.fill();
+		}
 	}
 
-	anotherPlayersAngleToMainPlayer = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer);
-	const isOtherPlayerInSight = checkIfAnotherPlayerIsInSight(this.rayAngleArray[0], this.rayAngleArray[this.rayAngleArray.length - 1], this.fov, anotherPlayersAngleToMainPlayer);
+	const isOtherPlayerInSight = checkIfAnotherPlayerIsInSight(rayAngleArray[0], rayAngleArray[rayAngleArray.length - 1], this.fov, anotherPlayersAngleToMainPlayer);
 
 	if (isOtherPlayerInSight) {
 		drawOtherPlayer(otherPlayer, anotherPlayersAngleToMainPlayer);
 	}
-	//console.log(anotherPlayersAngleToMainPlayer, isOtherPlayerInSight, this.mainPlayer.x, this.mainPlayer.y, player1.x, player1.y)
 }
 Game.prototype.drawMinimap = function() {
 	// variables
