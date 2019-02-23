@@ -735,15 +735,17 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 			// this function is called when another player is garanteed in sight
 			anotherPlayersAngleToMainPlayer += Math.PI * 2
 		}
-		otherPlayerPosOnScreen = Math.floor(((anotherPlayersAngleToMainPlayer - start) / this.dAlpha) * param.resolution);
+		otherPlayerPosOnScreen = Math.floor((anotherPlayersAngleToMainPlayer - start) / this.dAlpha);
 		const wallDistAtThisPos = this.wallDistArrayBeforeFishEyeCorrection[otherPlayerPosOnScreen];
 		if (z < wallDistAtThisPos) {
 			// check if another player is blocked by wall is HERE!!
 			const ctx = document.getElementById('mainCanvas').getContext('2d');
 			ctx.fillStyle = 'black';
 			ctx.beginPath();
-			ctx.fillRect(otherPlayerPosOnScreen - playerCurrentWidth / 2, (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth, playerCurrentHeight);
+			ctx.fillRect((otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2), (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth, playerCurrentHeight);
 			ctx.fill();
+		} else {
+			console.log(z, wallDistAtThisPos, otherPlayerPosOnScreen)
 		}
 	}
 
