@@ -2,11 +2,14 @@
 <head>
 <title>cs_assaut by Raycaster</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<link href="https://fonts.googleapis.com/css?family=VT323" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css?family=Ubuntu" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/solid.css" integrity="sha384-r/k8YTFqmlOaqRkZuSiE9trsrDXkh07mRaoGBMoDcmA58OHILZPsk29i2BsFng1B" crossorigin="anonymous">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/fontawesome.css" integrity="sha384-4aon80D8rXCGx9ayDt85LbyUHeMWd3UiBaWliBlJ53yzm9hqN21A+o1pqoyK04h+" crossorigin="anonymous">
 <style>
+@font-face {
+  font-family: 'csFont';
+  src: URL('./assets/cs_regular.ttf') format('truetype');
+}
 body {
 	width: 100vw;
 	max-width: 100%;
@@ -44,11 +47,13 @@ body {
 	left: 0;
 }
 #instructionComponent {
-	color: rgb(0,255,0); 
+	color: rgb(255, 255, 0, 0.8); 
 	background-color: rgba(0,0,0,0.8);
 	opacity: 1;
-	font-family: 'VT323', monospace;
+	font-family: 'csFont', monospace;
 	font-size: 24px; 
+	line-height: 1.2em;
+	letter-spacing: 0.0625em;
 	position: fixed;
 	z-index: 10;
 	top: 0;
@@ -64,7 +69,14 @@ body {
 }
 #instructionComponent h1 {
 	font-size: 48px; 
-	margin: 20px;
+}
+#instructionComponent h2 {
+	/* copyright */
+	position: relative;
+	font-size: 16px;
+	float: right;
+	margin-top: 20px;
+	line-height: 1em;
 }
 #instructionComponent ul {
 	list-style: none;
@@ -158,6 +170,34 @@ body {
 	background-color: rgba(100,100,100,0.1);
 	cursor: pointer;
 }
+#playerStatusComponent {
+	color: rgb(255, 255, 0, 0.8); 
+	font-family: 'csFont', monospace;
+	letter-spacing: 0.0625em;
+	position: fixed;
+	left: 10px;
+	bottom: 10px;
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	justify-content: center;
+	z-index: 10;
+	font-size: 32px;
+}
+.playerStatusGroupWrapper {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	margin: 0 50px;
+}
+.playerStatusIcon {
+	transform: rotate(45deg);
+	margin: 0 10px;
+}
+.playerStatusValue span {
+	margin: 0 5px;
+}
 a{
 	text-decoration: none;
 	display: block;
@@ -165,7 +205,10 @@ a{
 }
 a:link, a:visited, a:hover, a:active{
 	text-decoration: none;
-	color: rgb(0,255,0);
+	color: inherit;
+}
+a:hover {
+	opacity: 1;
 }
 </style>
 </head>
@@ -180,8 +223,9 @@ a:link, a:visited, a:hover, a:active{
 		width = window.innerWidth,
 		height = window.innerHeight,
 		assetsUrlObj = {
-			sky: './assets/sky.jpg'
-			//wall: 'https://s3.us-east-2.amazonaws.com/xiaoxihome/webprojects/raycasterAssets/wall.jpg'
+			sky: './assets/sky.jpg',
+			gun: './assets/gun.png',
+			muzzle: './assets/muzzle.png',
 		};
 	GlobalVar.prototype.getWindowWidth = function() {
 		return width
@@ -201,6 +245,10 @@ const CONST = new GlobalVar();
 		this.resolution /* it will be divided by window width */ = 1;
 		this.resolutionHigh = 1;
 		this.resolutionLow = 5;
+		//
+		this.healthPointMax = 100;
+		this.currentMagzineMax = 30;
+		this.totalMagzineMax = 120;
 	};
 	const mapGrid = 
 	[
@@ -298,7 +346,33 @@ function State() {
 	// states
 	this.currentJumpVelocity = 0;
 	this.accumulatedJumpHeight = 0;
+	//
 	this.isTogglingMiniMap /* 1: enlarging, 0: false, -1: shrinking */ = 0;
+	//
+	this.gunPositionOffsetX = 0;
+	this.gunPositionOffsetY = 0;
+	this.gunPositionOffsetMax = 10;
+	this.gunPositionOffsetXIncrementSign = 1;
+	this.gunPositionOffsetYIncrementSign = 1;
+	this.isGunPositionFiringOffset = false;
+	this.gunPositionFiringOffsetX = 0;
+	this.gunPositionFiringOffsetY = 0;
+	this.gunPositionFiringOffsetMax = 30;
+	this.gunPositionFiringOffsetXIncrementSign = 1;
+	this.gunPositionFiringOffsetYIncrementSign = 1;
+	this.isFiring = false;
+	this.isFireRequested = false;
+	this.isReloadRequested = false;
+	this.isReloading = false;
+	this.muzzleRotate = Math.random() * Math.PI * 2;
+	this.thisRoundFiringFinished = true;
+	this.craterX;
+	this.craterY;
+	this.recoilMax = 10;
+	//
+	this.healthPoint = param.healthPointMax;
+	this.currentMagzine = param.currentMagzineMax;
+	this.totalMagzine = param.totalMagzineMax;
 }
 
 // init objects
@@ -318,6 +392,9 @@ function Player() {
 	this.moveSpeed = 0.06;
 	this.rotateSpeed = 0.02;
 	this.mapGrid = param.getMapGrid();
+	this.totalMagzine = 120;
+	// related to jump function
+	this.gravity = param.getGravity();
 }
 Player.prototype.move = function() {
 	let moveState = this.forward ? 1 : this.backward ? -1 : 0;
@@ -337,6 +414,115 @@ Player.prototype.move = function() {
 	if (rotateState) {
 		this.alpha = this.rotateSpeed * rotateState + this.alpha;
 	}
+
+	//jump
+	let currentJumpVelocity = state.currentJumpVelocity;
+	const 
+		gravity = this.gravity,
+		jumpHiehtInThisFrame /* vt, t=1 here */ = currentJumpVelocity,
+		accumulatedJumpHeightAfterThisJump = state.accumulatedJumpHeight + jumpHiehtInThisFrame;
+	
+	if (accumulatedJumpHeightAfterThisJump > 0) {
+		// still jumping
+		state.currentJumpVelocity = currentJumpVelocity - gravity;
+		state.accumulatedJumpHeight += jumpHiehtInThisFrame;
+	} else {
+		// returned ground
+		state.currentJumpVelocity = 0;
+		state.accumulatedJumpHeight = 0;
+	}
+	// gun position offset
+	if (this.forward || this.backward) {
+		let 
+			incrementX = Math.random(),
+			incrementY = Math.random(),
+			nextOffsetX = state.gunPositionOffsetX + incrementX * state.gunPositionOffsetXIncrementSign,
+			nextOffsetY = state.gunPositionOffsetY + incrementY * state.gunPositionOffsetYIncrementSign;
+		if (Math.abs(nextOffsetX) > state.gunPositionOffsetMax) {
+			state.gunPositionOffsetXIncrementSign *= -1;
+			nextOffsetX = state.gunPositionOffsetX + incrementX * state.gunPositionOffsetXIncrementSign;
+		}
+		if (Math.abs(nextOffsetY) > state.gunPositionOffsetMax) {
+			state.gunPositionOffsetYIncrementSign *= -1;
+			nextOffsetY = state.gunPositionOffsetY + incrementY * state.gunPositionOffsetYIncrementSign;
+		}
+		state.gunPositionOffsetX = nextOffsetX;
+		state.gunPositionOffsetY = nextOffsetY;
+	}
+	// firing
+	const 
+		currentMagzineText  = document.getElementById('plaerStatusCurrentMagzine'),
+		totalMagzineText  = document.getElementById('plaerStatusTotalMagzine');
+
+	const reload = () => {
+		state.isReloading = true;
+		state.isFiring = false;
+		state.thisRoundFiringFinished = true;
+			setTimeout(() => {
+				const roundRequired = param.currentMagzineMax - state.currentMagzine;
+				if (state.totalMagzine === 0) {
+
+				} else if (roundRequired <= state.totalMagzine) {
+					state.currentMagzine = param.currentMagzineMax;
+					state.totalMagzine -= roundRequired;
+				} else {
+					state.currentMagzine += state.totalMagzine;
+					state.totalMagzine = 0;
+				}
+
+				currentMagzineText.innerHTML = state.currentMagzine;
+				totalMagzineText.innerHTML = state.totalMagzine;
+				state.isReloading = false;
+				state.isReloadRequested = false;
+			}, 1000)
+	};
+	const fireNewRound = () => {
+		const currentMagzine = state.currentMagzine;
+		if (currentMagzine) {
+			// still have bullet in current mag
+			state.isFiring = true;
+			state.thisRoundFiringFinished = false;
+			state.muzzelRotate = Math.random() * Math.PI * 2;
+			state.currentMagzine--;
+			state.craterX = CONST.getWindowWidth() * 0.5 + (Math.random() - 0.5) * state.recoilMax;
+			state.craterY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * state.recoilMax;
+			// update text
+			currentMagzineText.innerHTML = state.currentMagzine;
+			setTimeout(() => {
+				state.thisRoundFiringFinished = true;
+			}, 100)
+			// recoil
+			if (state.isGunPositionFiringOffset) {
+				state.gunPositionFiringOffsetX = 0;
+				state.gunPositionFiringOffsetY = 0;
+				state.isGunPositionFiringOffset = false;
+			} else {
+				let 
+					offsetX = state.gunPositionFiringOffsetMax * 0.5 + Math.random() * state.gunPositionFiringOffsetMax * 0.5,
+					offsetY = state.gunPositionFiringOffsetMax * 0.5 + Math.random() * state.gunPositionFiringOffsetMax * 0.5;
+				nextOffsetX = state.gunPositionFiringOffsetX + offsetX * state.gunPositionFiringOffsetXIncrementSign;
+				nextOffsetY = state.gunPositionFiringOffsetY + offsetY * state.gunPositionFiringOffsetYIncrementSign;
+				state.gunPositionFiringOffsetXIncrementSign *= -1;
+				state.gunPositionFiringOffsetYIncrementSign *= -1;
+				state.gunPositionFiringOffsetX = nextOffsetX;
+				state.gunPositionFiringOffsetY = nextOffsetY;
+				state.isGunPositionFiringOffset = true;
+			}
+		} else {
+			// reload
+			state.isReloadRequested = true;
+		}
+	};
+
+	if (state.isReloading) {
+		return
+	} else if (state.isReloadRequested) {
+		reload()
+	} else if (state.isFireRequested && state.thisRoundFiringFinished) {
+		fireNewRound()
+	} else if (!state.isFireRequested && state.isFiring) {
+		state.isFiring = false;
+	}
 };
 function Game() {
 	this.mainPlayer;
@@ -351,8 +537,6 @@ function Game() {
 	this.dAlpha; /* angle between rays */
 	// get vars from param
 	this.mapGrid = param.getMapGrid();
-	// related to jump function
-	this.gravity = param.getGravity();
 	//
 	this.miniMapSizeMax = param.getMiniMapSizeMax();
 	this.miniMapSizeMin = param.getMiniMapSizeMin();
@@ -376,7 +560,9 @@ Game.prototype.initiateCanvas = function() {
 	// toolbar
 	const toolBarComponent = new ToolBarComponent();
 	toolBarComponent.mountComponent();
-
+	// player stats
+	const playerStatusComponent = new PlayerStatusComponent();
+	playerStatusComponent.mountComponent();
 };
 Game.prototype.createPlayers = function() {
 	this.mainPlayer = new Player();
@@ -585,23 +771,6 @@ Game.prototype.drawFrame = function() {
 	if (direction >= 0.75) {
 		ctx.drawImage(sky, 0, 0, 0.25*skyWidth, skyHeight, (1-direction)/0.25*width, 0, width, 0.6*height);
 	}
-
-//jump
-	let currentJumpVelocity = state.currentJumpVelocity;
-	const 
-		gravity = this.gravity,
-		jumpHiehtInThisFrame /* vt, t=1 here */ = currentJumpVelocity,
-		accumulatedJumpHeightAfterThisJump = state.accumulatedJumpHeight + jumpHiehtInThisFrame;
-	
-	if (accumulatedJumpHeightAfterThisJump > 0) {
-		// still jumping
-		state.currentJumpVelocity = currentJumpVelocity - gravity;
-		state.accumulatedJumpHeight += jumpHiehtInThisFrame;
-	} else {
-		// returned ground
-		state.currentJumpVelocity = 0;
-		state.accumulatedJumpHeight = 0;
-	}
 //floor
 	ctx.beginPath();
 	ctx.fillStyle = 'rgba(150,150,150,1)';
@@ -624,7 +793,7 @@ Game.prototype.drawFrame = function() {
 		const wallColor = wallColorArray[hitWallType - 1][hitDirection];
 		ctx.fillStyle = wallColor;
 		ctx.beginPath();
-		ctx.fillRect(index * resolution, wallStart + accumulatedJumpHeightAfterThisJump, resolution, wallEnd - wallStart);
+		ctx.fillRect(index * resolution, wallStart + state.accumulatedJumpHeight, resolution, wallEnd - wallStart);
 		ctx.fill();
 	})
 
@@ -653,6 +822,38 @@ Game.prototype.drawFrame = function() {
 	ctx.lineTo(0.5*width,0.5*height+20+crosshairSize);
 	ctx.stroke();
 
+	// gun
+	const
+		gun = document.getElementById("gun"),
+		gunWidthSource = gun.width,
+		gunHeightSource = gun.height,
+		gunPosStartX = 0.5*width + state.gunPositionOffsetX + state.gunPositionFiringOffsetX,
+		gunPosStartY = 0.6*height + state.gunPositionOffsetY + state.gunPositionOffsetMax + state.gunPositionFiringOffsetX + state.gunPositionFiringOffsetMax,
+		gunWidth = 0.4*width,
+		gunHeight = 0.4*height;
+	if (state.isFiring) {
+		const 
+			muzzle = document.getElementById("muzzle"),
+			muzzleWidthSource = muzzle.width,
+			muzzleHeightSource = muzzle.height,
+			muzzleHeight = 0.2 * gunWidth,
+			muzzleWidth = muzzleHeight,
+			muzzleCenterX = gunPosStartX + gunWidth * (5.4 / 20.7),
+			muzzleCenterY = gunPosStartY + gunHeight * (1.7 / 13.2),
+			muzzlePosStartX = 0 - 0.5 * muzzleWidth, /* after translate, muzzle center is 0,0 */
+			muzzlePosStartY = 0 - 0.5 * muzzleHeight;
+		ctx.translate(muzzleCenterX, muzzleCenterY);
+		ctx.rotate(state.muzzelRotate);
+		ctx.drawImage(muzzle, 0, 0, muzzleWidthSource, muzzleHeightSource, muzzlePosStartX, muzzlePosStartY, muzzleWidth, muzzleHeight);
+		ctx.rotate(-state.muzzelRotate);
+		ctx.translate(-muzzleCenterX, -muzzleCenterY);
+
+		ctx.fillStyle = 'rgb(0,0,0)';
+		ctx.beginPath();
+		ctx.arc(state.craterX, state.craterY, 2, 0, 2 * Math.PI);
+		ctx.fill();
+	}
+	ctx.drawImage(gun, 0, 0, gunWidthSource, gunHeightSource, gunPosStartX, gunPosStartY, gunWidth, gunHeight);
 	// Minimap
 	this.drawMinimap();
 }
@@ -744,8 +945,6 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 			ctx.beginPath();
 			ctx.fillRect((otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2), (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth, playerCurrentHeight);
 			ctx.fill();
-		} else {
-			console.log(z, wallDistAtThisPos, otherPlayerPosOnScreen)
 		}
 	}
 
@@ -828,23 +1027,23 @@ Game.prototype.drawMinimap = function() {
 Game.prototype.attachEventListeners = function() {
 	const player = this.mainPlayer;
 	document.addEventListener('keydown', function(e) {
-					switch(e.keyCode){
-						case 65:
+					switch(e.code){
+						case 'KeyA':
 							player.counterClockwise = true;
 							break;
-						case 87:
+						case 'KeyW':
 							player.forward = true;
 							break;
-						case 68:
+						case 'KeyD':
 							player.clockwise = true;
 							break;
-						case 83:
+						case 'KeyS':
 							player.backward = true;
 							break;
-						case 32:
+						case 'Space':
 							if(!state.currentJumpVelocity) state.currentJumpVelocity = param.getInitialJumpVelocity();
 							break;
-						case 77:
+						case 'KeyM':
 							const isTogglingMiniMap = state.isTogglingMiniMap;
 							state.isTogglingMiniMap = !isTogglingMiniMap ?
 														1 :
@@ -853,21 +1052,30 @@ Game.prototype.attachEventListeners = function() {
 														1;
 
 							break;
+						case 'Enter':
+							if(!state.isFireRequested) state.isFireRequested = true;
+							break;
+						case 'KeyR':
+							if(!state.isReloadRequested) state.isReloadRequested = true;
+							break;
 					}
 })
 document.addEventListener('keyup', function(e) {
-					switch(e.keyCode){
-						case 65:
+					switch(e.code){
+						case 'KeyA':
 							player.counterClockwise = false;
 							break;
-						case 87:
+						case 'KeyW':
 							player.forward = false;
 							break;
-						case 68:
+						case 'KeyD':
 							player.clockwise = false;
 							break;
-						case 83:
+						case 'KeyS':
 							player.backward = false;
+							break;
+						case 'Enter':
+							state.isFireRequested = false;
 							break;	
 					}
 })
@@ -1024,7 +1232,8 @@ InstructionComponent.prototype.mountComponent = function() {
 					'<li><a href="http://www.playfuljs.com/a-first-person-engine-in-265-lines/" target="_blank">PlayfulJS.com</a></li>' +
 					'<li><a href="http://permadi.com/1996/05/ray-casting-tutorial-table-of-contents/" target="_blank">Permadi.com</a></li>' +
 					'<li><a href="http://lodev.org/cgtutor/raycasting.html" target="_blank">Lodev.org</a></li>' +
-				'</ul>';
+				'</ul>' +
+			'<h2><a href="https://www.xiaoxihome.com" target="_blank"><span>&copy; XIAOXIHOME.COM 2017~2018</span></a><h2>';
 	rootDiv.appendChild(instructionComponent);
 	this.component = instructionComponent;
 	this.addEventListener();
@@ -1119,6 +1328,34 @@ ToolBarComponent.prototype.openSettingDropdown = function() {
 		dropdown.style.visibility = 'visible'
 		this.isSettingDropdownActive = true;
 	}
+}
+
+function PlayerStatusComponent() {
+	this.component;
+}
+PlayerStatusComponent.prototype.mountComponent = function() {
+	const rootDiv = document.getElementById('root');
+	const playerStatusComponent = document.createElement('div');
+	playerStatusComponent.id = 'playerStatusComponent';
+	playerStatusComponent.innerHTML = 
+			'<div class="playerStatusGroupWrapper">' +
+				'<div class="playerStatusIcon" style="position: relative; top: -0.1em;">' +
+					'<i class="fas fa-times-circle"></i>' +
+				'</div>' +
+				'<div class="playerStatusValue">' +
+					'<span id="plaerStatusHealthPoint">' + state.healthPoint + '</span>' +
+				'</div>' +
+			'</div>' +
+			'<div class="playerStatusGroupWrapper">' +
+				'<div class="playerStatusIcon" style="position: relative; top: -0.4em;">' +
+					'<i class="fas fa-joint"></i>' +
+				'</div>' +
+				'<div class="playerStatusValue">' +
+					'<span id="plaerStatusCurrentMagzine">' + state.currentMagzine + '</span>' + '|' + '<span id="plaerStatusTotalMagzine">' + state.totalMagzine + '</span>' +
+				'</div>' +
+			'</div>';
+	rootDiv.appendChild(playerStatusComponent);
+	this.component = playerStatusComponent;
 }
 
 
