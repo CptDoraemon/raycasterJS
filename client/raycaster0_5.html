@@ -47,7 +47,7 @@ body {
 	left: 0;
 }
 #instructionComponent {
-	color: rgb(255, 255, 0, 0.8); 
+	color: rgba(255, 255, 0, 0.8); 
 	background-color: rgba(0,0,0,0.8);
 	opacity: 1;
 	font-family: 'csFont', monospace;
@@ -81,6 +81,10 @@ body {
 #instructionComponent ul {
 	list-style: none;
 	margin: 0;
+}
+#instructionComponent a:hover {
+	color: rgb(255, 255, 255); 
+	transition: 0.3s;
 }
 #toolBarComponent {
 	position: fixed;
@@ -171,7 +175,7 @@ body {
 	cursor: pointer;
 }
 #playerStatusComponent {
-	color: rgb(255, 255, 0, 0.8); 
+	color: rgba(255, 255, 0, 0.8); 
 	font-family: 'csFont', monospace;
 	letter-spacing: 0.0625em;
 	position: fixed;
@@ -204,7 +208,6 @@ a{
 	padding: 0 5%;  
 }
 a:link, a:visited, a:hover, a:active{
-	text-decoration: none;
 	color: inherit;
 }
 a:hover {
@@ -248,7 +251,12 @@ const CONST = new GlobalVar();
 		//
 		this.healthPointMax = 100;
 		this.currentMagzineMax = 30;
-		this.totalMagzineMax = 120;
+		this.totalMagzineMax = 240;
+		//
+		this.recoilStaticMax = 10;
+		this.recoilMovingMax = 100;
+		this.gunPositionOffsetMax = 10;
+		this.gunPositionFiringOffsetMax = 30;
 	};
 	const mapGrid = 
 	[
@@ -351,13 +359,11 @@ function State() {
 	//
 	this.gunPositionOffsetX = 0;
 	this.gunPositionOffsetY = 0;
-	this.gunPositionOffsetMax = 10;
 	this.gunPositionOffsetXIncrementSign = 1;
 	this.gunPositionOffsetYIncrementSign = 1;
 	this.isGunPositionFiringOffset = false;
 	this.gunPositionFiringOffsetX = 0;
 	this.gunPositionFiringOffsetY = 0;
-	this.gunPositionFiringOffsetMax = 30;
 	this.gunPositionFiringOffsetXIncrementSign = 1;
 	this.gunPositionFiringOffsetYIncrementSign = 1;
 	this.isFiring = false;
@@ -366,13 +372,15 @@ function State() {
 	this.isReloading = false;
 	this.muzzleRotate = Math.random() * Math.PI * 2;
 	this.thisRoundFiringFinished = true;
-	this.craterX;
-	this.craterY;
-	this.recoilMax = 10;
+	this.bulletHitX;
+	this.bulletHitY;
+	this.reloadingTextOpacity = 1;
+	this.reloadingTextOpacityIncrementSign = -1;
 	//
 	this.healthPoint = param.healthPointMax;
 	this.currentMagzine = param.currentMagzineMax;
 	this.totalMagzine = param.totalMagzineMax;
+	this.isMagzineEmpty = false;
 }
 
 // init objects
@@ -389,8 +397,8 @@ function Player() {
 	this.backward = false;
 	this.clockwise = false;
 	this.counterClockwise = false;
-	this.moveSpeed = 0.06;
-	this.rotateSpeed = 0.02;
+	this.moveSpeed = 0.05;
+	this.rotateSpeed = 0.01;
 	this.mapGrid = param.getMapGrid();
 	this.totalMagzine = 120;
 	// related to jump function
@@ -438,11 +446,11 @@ Player.prototype.move = function() {
 			incrementY = Math.random(),
 			nextOffsetX = state.gunPositionOffsetX + incrementX * state.gunPositionOffsetXIncrementSign,
 			nextOffsetY = state.gunPositionOffsetY + incrementY * state.gunPositionOffsetYIncrementSign;
-		if (Math.abs(nextOffsetX) > state.gunPositionOffsetMax) {
+		if (Math.abs(nextOffsetX) > param.gunPositionOffsetMax) {
 			state.gunPositionOffsetXIncrementSign *= -1;
 			nextOffsetX = state.gunPositionOffsetX + incrementX * state.gunPositionOffsetXIncrementSign;
 		}
-		if (Math.abs(nextOffsetY) > state.gunPositionOffsetMax) {
+		if (Math.abs(nextOffsetY) > param.gunPositionOffsetMax) {
 			state.gunPositionOffsetYIncrementSign *= -1;
 			nextOffsetY = state.gunPositionOffsetY + incrementY * state.gunPositionOffsetYIncrementSign;
 		}
@@ -455,21 +463,34 @@ Player.prototype.move = function() {
 		totalMagzineText  = document.getElementById('plaerStatusTotalMagzine');
 
 	const reload = () => {
+		if (state.currentMagzine === param.currentMagzineMax) {
+			// full mag, no need to reload
+			state.isReloadRequested = false;
+			return;
+		}
 		state.isReloading = true;
 		state.isFiring = false;
 		state.thisRoundFiringFinished = true;
 			setTimeout(() => {
 				const roundRequired = param.currentMagzineMax - state.currentMagzine;
-				if (state.totalMagzine === 0) {
-
-				} else if (roundRequired <= state.totalMagzine) {
+				if (roundRequired <= state.totalMagzine) {
+					// normal reloading
 					state.currentMagzine = param.currentMagzineMax;
 					state.totalMagzine -= roundRequired;
 				} else {
+					// last mag not enough for full reload
 					state.currentMagzine += state.totalMagzine;
 					state.totalMagzine = 0;
 				}
 
+				if (state.totalMagzine === 0) {
+					// mag empty
+					const red = 'rgba(255, 69, 0, 1)';
+					state.isMagzineEmpty = true;
+					currentMagzineText.style.color = red;
+					totalMagzineText.style.color = red;
+				}
+				// update text
 				currentMagzineText.innerHTML = state.currentMagzine;
 				totalMagzineText.innerHTML = state.totalMagzine;
 				state.isReloading = false;
@@ -484,8 +505,11 @@ Player.prototype.move = function() {
 			state.thisRoundFiringFinished = false;
 			state.muzzelRotate = Math.random() * Math.PI * 2;
 			state.currentMagzine--;
-			state.craterX = CONST.getWindowWidth() * 0.5 + (Math.random() - 0.5) * state.recoilMax;
-			state.craterY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * state.recoilMax;
+			// bullet hit position
+			const isMoving = this.forward || this.backward || state.currentJumpVelocity;
+			const recoil = isMoving ? param.recoilMovingMax : param.recoilStaticMax;
+			state.bulletHitX = CONST.getWindowWidth() * 0.5 + (Math.random() - 0.5) * recoil;
+			state.bulletHitY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * recoil;
 			// update text
 			currentMagzineText.innerHTML = state.currentMagzine;
 			setTimeout(() => {
@@ -498,8 +522,9 @@ Player.prototype.move = function() {
 				state.isGunPositionFiringOffset = false;
 			} else {
 				let 
-					offsetX = state.gunPositionFiringOffsetMax * 0.5 + Math.random() * state.gunPositionFiringOffsetMax * 0.5,
-					offsetY = state.gunPositionFiringOffsetMax * 0.5 + Math.random() * state.gunPositionFiringOffsetMax * 0.5;
+					gunPositionFiringOffsetMax = param.gunPositionFiringOffsetMax,
+					offsetX = gunPositionFiringOffsetMax * 0.5 + Math.random() * gunPositionFiringOffsetMax * 0.5,
+					offsetY = gunPositionFiringOffsetMax * 0.5 + Math.random() * gunPositionFiringOffsetMax * 0.5;
 				nextOffsetX = state.gunPositionFiringOffsetX + offsetX * state.gunPositionFiringOffsetXIncrementSign;
 				nextOffsetY = state.gunPositionFiringOffsetY + offsetY * state.gunPositionFiringOffsetYIncrementSign;
 				state.gunPositionFiringOffsetXIncrementSign *= -1;
@@ -508,7 +533,10 @@ Player.prototype.move = function() {
 				state.gunPositionFiringOffsetY = nextOffsetY;
 				state.isGunPositionFiringOffset = true;
 			}
-		} else {
+		} else if (state.isMagzineEmpty) {
+			// empty mag
+			state.isFireRequested = false;
+		} else if (!state.isMagzineEmpty) {
 			// reload
 			state.isReloadRequested = true;
 		}
@@ -516,11 +544,12 @@ Player.prototype.move = function() {
 
 	if (state.isReloading) {
 		return
-	} else if (state.isReloadRequested) {
+	} else if (state.isReloadRequested && !state.isMagzineEmpty) {
 		reload()
 	} else if (state.isFireRequested && state.thisRoundFiringFinished) {
 		fireNewRound()
 	} else if (!state.isFireRequested && state.isFiring) {
+		// enter key released
 		state.isFiring = false;
 	}
 };
@@ -801,7 +830,7 @@ Game.prototype.drawFrame = function() {
 	this.drawOtherPlayers(this.otherPlayers[0]);
 
 	//crosshair
-	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || this.mainPlayer.counterClockwise || this.mainPlayer.clockwise || state.currentJumpVelocity;
+	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || state.currentJumpVelocity;
 	const crosshairSize = isMoving ? 15 : 0;
 
 	ctx.strokeStyle = "rgba(0,255,0,1)";
@@ -828,7 +857,7 @@ Game.prototype.drawFrame = function() {
 		gunWidthSource = gun.width,
 		gunHeightSource = gun.height,
 		gunPosStartX = 0.5*width + state.gunPositionOffsetX + state.gunPositionFiringOffsetX,
-		gunPosStartY = 0.6*height + state.gunPositionOffsetY + state.gunPositionOffsetMax + state.gunPositionFiringOffsetX + state.gunPositionFiringOffsetMax,
+		gunPosStartY = 0.6*height + state.gunPositionOffsetY + param.gunPositionOffsetMax + state.gunPositionFiringOffsetX + param.gunPositionFiringOffsetMax,
 		gunWidth = 0.4*width,
 		gunHeight = 0.4*height;
 	if (state.isFiring) {
@@ -842,18 +871,38 @@ Game.prototype.drawFrame = function() {
 			muzzleCenterY = gunPosStartY + gunHeight * (1.7 / 13.2),
 			muzzlePosStartX = 0 - 0.5 * muzzleWidth, /* after translate, muzzle center is 0,0 */
 			muzzlePosStartY = 0 - 0.5 * muzzleHeight;
+			// draw muzzle
 		ctx.translate(muzzleCenterX, muzzleCenterY);
 		ctx.rotate(state.muzzelRotate);
 		ctx.drawImage(muzzle, 0, 0, muzzleWidthSource, muzzleHeightSource, muzzlePosStartX, muzzlePosStartY, muzzleWidth, muzzleHeight);
 		ctx.rotate(-state.muzzelRotate);
 		ctx.translate(-muzzleCenterX, -muzzleCenterY);
-
+		// draw crater
 		ctx.fillStyle = 'rgb(0,0,0)';
 		ctx.beginPath();
-		ctx.arc(state.craterX, state.craterY, 2, 0, 2 * Math.PI);
+		ctx.arc(state.bulletHitX, state.bulletHitY, 2, 0, 2 * Math.PI);
 		ctx.fill();
 	}
 	ctx.drawImage(gun, 0, 0, gunWidthSource, gunHeightSource, gunPosStartX, gunPosStartY, gunWidth, gunHeight);
+
+	// reloading text
+	if (state.isReloading) {
+		ctx.font = "36px csFont";
+		if (state.reloadingTextOpacity >= 0.5 && state.reloadingTextOpacity <= 1) {
+			state.reloadingTextOpacity = state.reloadingTextOpacity + 0.1 * state.reloadingTextOpacityIncrementSign
+		}
+		if (state.reloadingTextOpacity < 0.5) {
+			state.reloadingTextOpacity = 0.5;
+			state.reloadingTextOpacityIncrementSign = 1;
+		} else if (state.reloadingTextOpacity > 1) {
+			state.reloadingTextOpacity = 1;
+			state.reloadingTextOpacityIncrementSign = -1;
+		}
+		ctx.fillStyle = "rgba(255, 0, 0, " + state.reloadingTextOpacity + ")";
+		console.log("rgba(255, 0, 0, " + state.reloadingTextOpacity + ")");
+		ctx.textAlign = "center";
+		ctx.fillText("RELOADING", width * 0.5, height * 0.6); 
+	}
 	// Minimap
 	this.drawMinimap();
 }
@@ -941,7 +990,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 		if (z < wallDistAtThisPos) {
 			// check if another player is blocked by wall is HERE!!
 			const ctx = document.getElementById('mainCanvas').getContext('2d');
-			ctx.fillStyle = 'black';
+			ctx.fillStyle = 'red';
 			ctx.beginPath();
 			ctx.fillRect((otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2), (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth, playerCurrentHeight);
 			ctx.fill();
@@ -1027,23 +1076,23 @@ Game.prototype.drawMinimap = function() {
 Game.prototype.attachEventListeners = function() {
 	const player = this.mainPlayer;
 	document.addEventListener('keydown', function(e) {
-					switch(e.code){
-						case 'KeyA':
+					switch(e.keyCode){
+						case 65:
 							player.counterClockwise = true;
 							break;
-						case 'KeyW':
+						case 87:
 							player.forward = true;
 							break;
-						case 'KeyD':
+						case 68:
 							player.clockwise = true;
 							break;
-						case 'KeyS':
+						case 83:
 							player.backward = true;
 							break;
-						case 'Space':
+						case 32:
 							if(!state.currentJumpVelocity) state.currentJumpVelocity = param.getInitialJumpVelocity();
 							break;
-						case 'KeyM':
+						case 77:
 							const isTogglingMiniMap = state.isTogglingMiniMap;
 							state.isTogglingMiniMap = !isTogglingMiniMap ?
 														1 :
@@ -1052,29 +1101,29 @@ Game.prototype.attachEventListeners = function() {
 														1;
 
 							break;
-						case 'Enter':
+						case 13:
 							if(!state.isFireRequested) state.isFireRequested = true;
 							break;
-						case 'KeyR':
+						case 82:
 							if(!state.isReloadRequested) state.isReloadRequested = true;
 							break;
 					}
 })
 document.addEventListener('keyup', function(e) {
-					switch(e.code){
-						case 'KeyA':
+					switch(e.keyCode){
+						case 65:
 							player.counterClockwise = false;
 							break;
-						case 'KeyW':
+						case 87:
 							player.forward = false;
 							break;
-						case 'KeyD':
+						case 68:
 							player.clockwise = false;
 							break;
-						case 'KeyS':
+						case 83:
 							player.backward = false;
 							break;
-						case 'Enter':
+						case 13:
 							state.isFireRequested = false;
 							break;	
 					}
@@ -1224,6 +1273,8 @@ InstructionComponent.prototype.mountComponent = function() {
 					'<li>S: Move Back</li>' +
 					'<li>A: Turn Left</li>' +
 					'<li>D: Turn Right</li>' +
+					'<li>R: Reload</li>' +
+					'<li>Enter: Fire</li>' +
 					'<li>Space: Jump</li>' +
 					'<li>M: Toggle Map Zooming</li>' +
 				'</ul>' +
