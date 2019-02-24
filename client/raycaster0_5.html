@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <head>
-<title>cs_assaut by Raycaster</title>
+<title>cs_assault by Raycaster</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<link rel="shortcut icon" href="./assets/favicon.ico">
 <link href="https://fonts.googleapis.com/css?family=Ubuntu" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/solid.css" integrity="sha384-r/k8YTFqmlOaqRkZuSiE9trsrDXkh07mRaoGBMoDcmA58OHILZPsk29i2BsFng1B" crossorigin="anonymous">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/fontawesome.css" integrity="sha384-4aon80D8rXCGx9ayDt85LbyUHeMWd3UiBaWliBlJ53yzm9hqN21A+o1pqoyK04h+" crossorigin="anonymous">
@@ -28,7 +29,7 @@ body {
 	position: fixed;
 	top: 55%;
 	left: calc(50% - 150px);
-	z-index: 11;
+	z-index: 101;
 	color: black;
 	transition: color 0.5s;
 }
@@ -41,7 +42,7 @@ body {
 	color: white !important;
 }
 #loadingCanvas {
-	z-index: 10;
+	z-index: 100;
 	position: fixed;
 	top: 0;
 	left: 0;
@@ -237,6 +238,7 @@ a:hover {
 		return height
 	};
 	GlobalVar.prototype.getAssetsUrlObj = function(){
+		this.assetsCount = Object.keys(assetsUrlObj).length;
 		return assetsUrlObj
 	}
 })();
@@ -1160,9 +1162,10 @@ Game.prototype.play = function() {
 function Loading() {
 	this.loaded = 0;
 	this.total = 1;
-	this.isLoaded = false;
+	this.isLoaded /* count */= 0;
 }
 Loading.prototype.sendRequest = function() {
+	// this will also initiate CONST.assetsCount, which will be used in this.drawLoadingPage
 	const urlObj = CONST.getAssetsUrlObj();
 
 	function appendImg(url, elId) {
@@ -1176,14 +1179,24 @@ Loading.prototype.sendRequest = function() {
 	}
 	const loadImgThenAppendToDom = (url, elId) => {
 		const xml = new XMLHttpRequest();
+		let 
+			thisTotalAddedToSumTotal = false,
+			loaded = 0;
+
 		xml.open('GET', url, true);
 		xml.onprogress = (e) => {
-			this.loaded = e.loaded;
-			this.total = e.total;
+			const loadedIncrement = e.loaded - loaded;
+			this.loaded += loadedIncrement;
+			loaded = e.loaded;
+			// add total only on first time
+			if (!thisTotalAddedToSumTotal) {
+				this.total += e.total;
+				thisTotalAddedToSumTotal = true;
+			}
 		};
 		xml.onload = () => {
 			appendImg(url, elId);
-			this.isLoaded = true;
+			this.isLoaded += 1;
 		}
 		xml.send();
 	};
@@ -1244,7 +1257,7 @@ Loading.prototype.drawLoadingPage = function() {
 			ctx.fill();
 		}
 
-		if (canvasPercentage < 100 || !this.isLoaded) {
+		if (canvasPercentage < 100 || this.isLoaded !== CONST.assetsCount) {
 			// if the true loading speed is slower (slow 3g) than canvas animation epr frame speed, finishloading will be called before img append to DOM, therefore check this.isLoaded
 			requestAnimationFrame(frame)
 		} else {
