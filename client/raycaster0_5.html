@@ -415,6 +415,10 @@ function State() {
 	this.emptyBullets = [];
 	// server message
 	this.serverMessage = [];
+	// _id for this player
+	this.playerId;
+	//
+	this.latency = 'pinging';
 }
 State.prototype.updateServerMessage = function(newMessage) {
 	const 
@@ -901,7 +905,7 @@ Game.prototype.ray = function() {
 		result.push(hitWallType);
 		return result;
 	}
-}
+};
 Game.prototype.drawFrame = function() {
 	const 
 		width = CONST.getWindowWidth(),
@@ -1285,31 +1289,50 @@ Game.prototype.play = function() {
 	requestAnimationFrame(frame);
 }
 function ServerConnection() {
-	this.ws;
+	this.lastPing;
 }
 ServerConnection.prototype.initiateConnection = function() {
-	const ws = new WebSocket('ws://localhost:8080/socket');
-	this.ws = ws;
+	const domain = window.location.hostname;
+	const ws = new WebSocket('ws://' + domain + ':8080/socket');
+	const ping = this.ping;
+
 	ws.onopen = function() {
-		state.updateServerMessage('Connected to server');
+		state.updateServerMessage('Connected to the server');
 		const requestJoinGame = {
 			type: 'requestJoinGame',
-			payload: {
-				x: game.mainPlayer.x,
-				y: game.mainPlayer.y,
-				jumpHeight: state.accumulatedJumpHeight,
-				healthPoint: state.healthPoint
-			}
+			payload: '',
+			playerId: ''
 		};
-		ws.send(JSON.stringify(requestJoinGame))
-	}
+		ws.send(JSON.stringify(requestJoinGame));
+	};
+
 	ws.onmessage = function(e) {
 		const received = JSON.parse(e.data);
 		if (received.type === 'serverMessage') {
+			// serverMessage that need to be post to serverMessageComponent
 			state.updateServerMessage(received.payload);
+		} else if (received.type === 'playerId') {
+			// set _id for this player
+			state.playerId = received.payload;
+		} else if (received.type === 'pingBack') {
+			const whenDidThisPingSent = new Date(received.payload);
+			if (whenDidThisPingSent === this.lastPing) {
+				const now = new Date();
+				state.latency = now - whenDidThisPingSent + ' ms';
+			} else {
+				state.latency = 'packet loss'
+			}
 		}
 	}
 }
+ServerConnection.prototype.ping = function(ws) {
+	const now = new Date();
+	this.lastPing = now;
+	ws.send(JSON.stringify({type: 'ping', payload: now}));
+	console.log(state.latency)
+	setTimeout(this.ping, 1000);
+}
+
 function Loading() {
 	this.loaded = 0;
 	this.total = 1;
