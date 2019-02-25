@@ -6,6 +6,8 @@ const bodyParser = require('body-parser');
 // const dbUri = process.env.MONGODB_URI || 'mongodb://test:abcd1234@ds125684.mlab.com:25684/freecodecamp';
 
 const app = express();
+const port = process.env.PORT || 5000;
+app.listen(port);
 const WebSocket = require('ws');
 const wss = new WebSocket.Server({ port: 8080 });
 
@@ -104,9 +106,3 @@ function handlePing(ws, message) {
 		}
 	})
 }
-
-
-
-
-const port = process.env.PORT || 5000;
-app.listen(port);
