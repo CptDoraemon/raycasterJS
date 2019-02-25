@@ -7,9 +7,12 @@ const bodyParser = require('body-parser');
 
 const app = express();
 const port = process.env.PORT || 5000;
-app.listen(port);
+//app.listen(port);
 const WebSocket = require('ws');
-const wss = new WebSocket.Server({ port: 8080 });
+const http = require("http");
+const server = http.createServer(app);
+server.listen(port);
+const wss = new WebSocket.Server({ server: server });
 
 app.use(express.static('client'));
 app.use(bodyParser.json());
@@ -34,8 +37,6 @@ function State() {
 	this.isCheckPing = false;
 }
 const state = new State();
-
-
 
 wss.on('connection', (ws) => {
 	ws.send(JSON.stringify({type: 'serverMessage', payload: 'Greetings from the server!'}));

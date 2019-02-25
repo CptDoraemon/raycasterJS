@@ -1292,8 +1292,8 @@ function ServerConnection() {
 	this.lastPing;
 }
 ServerConnection.prototype.initiateConnection = function() {
-	const domain = window.location.hostname;
-	const ws = new WebSocket('ws://' + domain + ':8080');
+	const HOST = location.origin.replace(/^http/, 'ws')
+	const ws = new WebSocket(HOST);
 	const ping = this.ping;
 
 	ws.onopen = function() {
