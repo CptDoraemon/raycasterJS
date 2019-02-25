@@ -230,6 +230,7 @@ a:hover {
 			sky: './assets/sky.jpg',
 			gun: './assets/gun.png',
 			muzzle: './assets/muzzle.png',
+			emptyBullet: './assets/bullet.png'
 		};
 	GlobalVar.prototype.getWindowWidth = function() {
 		return width
@@ -385,8 +386,58 @@ function State() {
 	this.currentMagzine = param.currentMagzineMax;
 	this.totalMagzine = param.totalMagzineMax;
 	this.isMagzineEmpty = false;
+	//
+	this.emptyBullets = [];
 }
-
+State.prototype.updateGunPostion = function(isFiring=false) {
+	if (!isFiring) {
+		// when moving
+		let 
+			incrementX = Math.random(),
+			incrementY = Math.random(),
+			nextOffsetX = this.gunPositionOffsetX + incrementX * this.gunPositionOffsetXIncrementSign,
+			nextOffsetY = this.gunPositionOffsetY + incrementY * this.gunPositionOffsetYIncrementSign;
+		if (Math.abs(nextOffsetX) > param.gunPositionOffsetMax) {
+			this.gunPositionOffsetXIncrementSign *= -1;
+			nextOffsetX = this.gunPositionOffsetX + incrementX * this.gunPositionOffsetXIncrementSign;
+		}
+		if (Math.abs(nextOffsetY) > param.gunPositionOffsetMax) {
+			this.gunPositionOffsetYIncrementSign *= -1;
+			nextOffsetY = this.gunPositionOffsetY + incrementY * this.gunPositionOffsetYIncrementSign;
+		}
+		this.gunPositionOffsetX = nextOffsetX;
+		this.gunPositionOffsetY = nextOffsetY;
+	} else {
+		// when firing (recoil)
+		if (this.isGunPositionFiringOffset) {
+			this.gunPositionFiringOffsetX = 0;
+			this.gunPositionFiringOffsetY = 0;
+			this.isGunPositionFiringOffset = false;
+		} else {
+			let 
+				gunPositionFiringOffsetMax = param.gunPositionFiringOffsetMax,
+				offsetX = gunPositionFiringOffsetMax * 0.5 + Math.random() * gunPositionFiringOffsetMax * 0.5,
+				offsetY = gunPositionFiringOffsetMax * 0.5 + Math.random() * gunPositionFiringOffsetMax * 0.5;
+			nextOffsetX = this.gunPositionFiringOffsetX + offsetX * this.gunPositionFiringOffsetXIncrementSign;
+			nextOffsetY = this.gunPositionFiringOffsetY + offsetY * this.gunPositionFiringOffsetYIncrementSign;
+			this.gunPositionFiringOffsetXIncrementSign *= -1;
+			this.gunPositionFiringOffsetYIncrementSign *= -1;
+			this.gunPositionFiringOffsetX = nextOffsetX;
+			this.gunPositionFiringOffsetY = nextOffsetY;
+			this.isGunPositionFiringOffset = true;
+		}
+	}
+}
+State.prototype.getGunPostion = function() {
+	const
+		width = CONST.getWindowWidth(),
+		height = CONST.getWindowHeight(),
+		gunPosStartX = 0.5*width + this.gunPositionOffsetX + this.gunPositionFiringOffsetX,
+		gunPosStartY = 0.6*height + this.gunPositionOffsetY + param.gunPositionOffsetMax + this.gunPositionFiringOffsetY + param.gunPositionFiringOffsetMax,
+		gunWidth = 0.4*width,
+		gunHeight = 0.4*height;
+	return [gunPosStartX, gunPosStartY, gunWidth, gunHeight]
+}
 // init objects
 const 
 	param = new Param(),
@@ -409,6 +460,7 @@ function Player() {
 	this.gravity = param.getGravity();
 }
 Player.prototype.move = function() {
+	// update player coordinate
 	let moveState = this.forward ? 1 : this.backward ? -1 : 0;
 	let rotateState = this.clockwise ? 1 : this.counterClockwise ? -1 : 0;
 
@@ -421,6 +473,9 @@ Player.prototype.move = function() {
 		if (this.mapGrid[Math.floor(nextY)][Math.floor(this.x)] === 0) {
 			this.y = nextY;
 		}
+
+		// update gun position when walking
+		state.updateGunPostion(false);
 	}
 
 	if (rotateState) {
@@ -443,24 +498,7 @@ Player.prototype.move = function() {
 		state.currentJumpVelocity = 0;
 		state.accumulatedJumpHeight = 0;
 	}
-	// gun position offset
-	if (this.forward || this.backward) {
-		let 
-			incrementX = Math.random(),
-			incrementY = Math.random(),
-			nextOffsetX = state.gunPositionOffsetX + incrementX * state.gunPositionOffsetXIncrementSign,
-			nextOffsetY = state.gunPositionOffsetY + incrementY * state.gunPositionOffsetYIncrementSign;
-		if (Math.abs(nextOffsetX) > param.gunPositionOffsetMax) {
-			state.gunPositionOffsetXIncrementSign *= -1;
-			nextOffsetX = state.gunPositionOffsetX + incrementX * state.gunPositionOffsetXIncrementSign;
-		}
-		if (Math.abs(nextOffsetY) > param.gunPositionOffsetMax) {
-			state.gunPositionOffsetYIncrementSign *= -1;
-			nextOffsetY = state.gunPositionOffsetY + incrementY * state.gunPositionOffsetYIncrementSign;
-		}
-		state.gunPositionOffsetX = nextOffsetX;
-		state.gunPositionOffsetY = nextOffsetY;
-	}
+
 	// firing
 	const 
 		currentMagzineText  = document.getElementById('plaerStatusCurrentMagzine'),
@@ -504,7 +542,7 @@ Player.prototype.move = function() {
 	const fireNewRound = () => {
 		const currentMagzine = state.currentMagzine;
 		if (currentMagzine) {
-			// still have bullet in current mag
+			// do fire
 			state.isFiring = true;
 			state.thisRoundFiringFinished = false;
 			state.muzzelRotate = Math.random() * Math.PI * 2;
@@ -520,25 +558,23 @@ Player.prototype.move = function() {
 				state.thisRoundFiringFinished = true;
 			}, 100)
 			// recoil
-			if (state.isGunPositionFiringOffset) {
-				state.gunPositionFiringOffsetX = 0;
-				state.gunPositionFiringOffsetY = 0;
-				state.isGunPositionFiringOffset = false;
-			} else {
-				let 
-					gunPositionFiringOffsetMax = param.gunPositionFiringOffsetMax,
-					offsetX = gunPositionFiringOffsetMax * 0.5 + Math.random() * gunPositionFiringOffsetMax * 0.5,
-					offsetY = gunPositionFiringOffsetMax * 0.5 + Math.random() * gunPositionFiringOffsetMax * 0.5;
-				nextOffsetX = state.gunPositionFiringOffsetX + offsetX * state.gunPositionFiringOffsetXIncrementSign;
-				nextOffsetY = state.gunPositionFiringOffsetY + offsetY * state.gunPositionFiringOffsetYIncrementSign;
-				state.gunPositionFiringOffsetXIncrementSign *= -1;
-				state.gunPositionFiringOffsetYIncrementSign *= -1;
-				state.gunPositionFiringOffsetX = nextOffsetX;
-				state.gunPositionFiringOffsetY = nextOffsetY;
-				state.isGunPositionFiringOffset = true;
-			}
+			state.updateGunPostion(true);
+			// eject bullet shell
+			const 
+				gunPosition = state.getGunPostion(),
+				gunPosStartX = gunPosition[0],
+				gunPosStartY = gunPosition[1],
+				gunWidth = gunPosition[2],
+				gunHeight = gunPosition[3],
+				emptyBulletX = gunPosStartX + (10 / 20.8) * gunWidth,
+				emptyBulletY = gunPosStartY + (3.6 / 13.2) * gunHeight,
+				baseSpeed = gunWidth /* 0.4width */ * 0.05,
+				speedX = Math.random() * baseSpeed + baseSpeed,
+				speedY = Math.random() * -baseSpeed - baseSpeed,
+				thisRound = [emptyBulletX, emptyBulletY, speedX, speedY];
+			state.emptyBullets.push(thisRound);
 		} else if (state.isMagzineEmpty) {
-			// empty mag
+			// empty mag, not fire
 			state.isFireRequested = false;
 			if (!state.isShowingNoAmmoText) {
 				state.isShowingNoAmmoText = true;
@@ -547,13 +583,13 @@ Player.prototype.move = function() {
 				}, 1000)
 			}
 		} else if (!state.isMagzineEmpty) {
-			// reload
+			// reload, not fire
 			state.isReloadRequested = true;
 		}
 	};
 
 	if (state.isReloading) {
-		return
+		
 	} else if (state.isReloadRequested && !state.isMagzineEmpty) {
 		reload()
 	} else if (state.isFireRequested && state.thisRoundFiringFinished) {
@@ -561,6 +597,24 @@ Player.prototype.move = function() {
 	} else if (!state.isFireRequested && state.isFiring) {
 		// enter key released
 		state.isFiring = false;
+	}
+	// firing ends
+
+	// bullet shells, move all items in state.bullets
+	if (state.emptyBullets.length) {
+		const 
+			width = CONST.getWindowWidth(),
+			height = CONST.getWindowHeight(),
+			emptyBulletGravity = width * 0.005;
+		state.emptyBullets.map((i) => {
+			i[0] += i[2];	/* update X */
+			i[1] += i[3];	/* update Y */
+			i[3] += emptyBulletGravity; /* update speedY */
+		});
+		state.emptyBullets.filter(i => {
+			// filter bullets out of border
+			i[0] > width || i[0] < 0 || i[1] > height || i[1] < 0
+		})
 	}
 };
 function Game() {
@@ -863,13 +917,14 @@ Game.prototype.drawFrame = function() {
 
 	// gun
 	const
+		gunPosition = state.getGunPostion(),
+		gunPosStartX = gunPosition[0],
+		gunPosStartY = gunPosition[1],
+		gunWidth = gunPosition[2],
+		gunHeight = gunPosition[3],
 		gun = document.getElementById("gun"),
 		gunWidthSource = gun.width,
-		gunHeightSource = gun.height,
-		gunPosStartX = 0.5*width + state.gunPositionOffsetX + state.gunPositionFiringOffsetX,
-		gunPosStartY = 0.6*height + state.gunPositionOffsetY + param.gunPositionOffsetMax + state.gunPositionFiringOffsetX + param.gunPositionFiringOffsetMax,
-		gunWidth = 0.4*width,
-		gunHeight = 0.4*height;
+		gunHeightSource = gun.height;
 	if (state.isFiring) {
 		const 
 			muzzle = document.getElementById("muzzle"),
@@ -894,6 +949,15 @@ Game.prototype.drawFrame = function() {
 		ctx.fill();
 	}
 	ctx.drawImage(gun, 0, 0, gunWidthSource, gunHeightSource, gunPosStartX, gunPosStartY, gunWidth, gunHeight);
+	// empty bullet
+	const 
+		emptyBullet = document.getElementById("emptyBullet"),
+		emptyBulletWidth = emptyBullet.width,
+		emptyBulletHeight = emptyBullet.height,
+		bulletDimension = gunWidth * 0.05;
+	state.emptyBullets.map((i) => {
+		ctx.drawImage(emptyBullet, 0, 0, emptyBulletWidth, emptyBulletHeight, i[0], i[1], bulletDimension, bulletDimension);
+	})
 
 	// reloading text
 	const flasingText = (messageString) => {
