@@ -287,7 +287,7 @@ const CONST = new GlobalVar();
 		this.gunPositionFiringOffsetMax = 30;
 	};
 	const mapGrid = 
-	[
+	[	// 40 * 40, T left wall x is 23
 		[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 		[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -421,6 +421,12 @@ function State() {
 	this.latency = 'pinging';
 	this.isDisplayingLatency = true;
 	this.isLowerGraphicQuality = false;
+	//
+	this.playersArray = [];
+	//
+	this.isConnectedToServer = false;
+	// hitZone will only be push into array if it was drawn (guaranteed in sight) on frame, this array is cleared on the beginning of draw other players.
+	this.hitZone = [];
 }
 State.prototype.updateServerMessage = function(newMessage) {
 	const 
@@ -507,9 +513,13 @@ const
 	game = new Game(),
 	serverConnection = new ServerConnection();
 
-function Player() {
-	this.x /* init coordinate x */ = 5;
-	this.y /* init coordinate y */ = Math.floor(10 + Math.random() * 20);
+function Player(x, y, healthPoint, currentJumpHeight) {
+	const CTRespawn = [[3, 10], [3, 15], [3, 20], [3, 25], [3, 30]];
+	const TRespawn = [[25, 16], [25, 27], [26, 17], [34, 16], [34, 17]];
+	const isCT = (Math.random() > 0.5);
+	const respawnPos = Math.floor(Math.random() * 5);
+	this.x /* init coordinate x */ = x ? x : isCT ? CTRespawn[respawnPos][0] : TRespawn[respawnPos][0];
+	this.y /* init coordinate y */ = y ? y : isCT ? CTRespawn[respawnPos][1] : TRespawn[respawnPos][1];
 	this.alpha /* init direction angle, relative to positive x axis */ = Math.random() > 0.5 ? (-0.75 * Math.PI * 2) /* up */: (0.25 * Math.PI * 2) /* down */;
 	this.forward = false;
 	this.backward = false;
@@ -521,6 +531,9 @@ function Player() {
 	this.totalMagzine = 120;
 	// related to jump function
 	this.gravity = param.getGravity();
+	//
+	if (healthPoint) this.healthPoint = healthPoint;
+	if (currentJumpHeight) this.currentJumpHeight = currentJumpHeight;
 }
 Player.prototype.move = function() {
 	// update player coordinate
@@ -613,8 +626,20 @@ Player.prototype.move = function() {
 			// bullet hit position
 			const isMoving = this.forward || this.backward || state.currentJumpVelocity;
 			const recoil = isMoving ? param.recoilMovingMax : param.recoilStaticMax;
-			state.bulletHitX = CONST.getWindowWidth() * 0.5 + (Math.random() - 0.5) * recoil;
-			state.bulletHitY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * recoil;
+			const bulletHitX = CONST.getWindowWidth() * 0.5 + (Math.random() - 0.5) * recoil;
+			const bulletHitY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * recoil;
+			state.bulletHitX = bulletHitX;
+			state.bulletHitY = bulletHitY;
+			// check hit
+			if (state.hitZone.length) {
+				state.hitZone.map(i => {
+					// [otherplayer.playerId, drawX. drawY, drawWidth, drawHeight]
+					const isHit = (i[1] < bulletHitX) && (bulletHitX < (i[1] + i[3])) && (i[2] < bulletHitY) && (bulletHitY < (i[2] + i[4]));
+					if (isHit) {
+						console.log('you hit player ' + i[0])
+					}
+				})
+			}
 			// update text
 			currentMagzineText.innerHTML = state.currentMagzine;
 			setTimeout(() => {
@@ -724,10 +749,8 @@ Game.prototype.initiateCanvas = function() {
 	serverMessageComponent.mountComponent();
 	state.updateServerMessage('Establishing connection to server');
 };
-Game.prototype.createPlayers = function() {
+Game.prototype.createMainPlayer = function() {
 	this.mainPlayer = new Player();
-	const player1 = new Player();
-	this.otherPlayers.push(player1);
 };
 Game.prototype.ray = function() {
 	//Prepare rayArray
@@ -959,9 +982,9 @@ Game.prototype.drawFrame = function() {
 	})
 
 	// otherplayer
-	this.drawOtherPlayers(this.otherPlayers[0]);
+	this.otherPlayers.map(otherplayer => this.drawOtherPlayers(otherplayer));
 
-	//crosshair
+	// crosshair
 	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || state.currentJumpVelocity;
 	const crosshairSize = isMoving ? 15 : 0;
 
@@ -1061,7 +1084,14 @@ Game.prototype.drawFrame = function() {
 	// Minimap
 	this.drawMinimap();
 }
+Game.prototype.updateOtherPlayers = function() {
+	let array = state.playersArray.slice();
+	array = array.filter((obj) => obj.playerId !== state.playerId);
+	this.otherPlayers = array;
+}
 Game.prototype.drawOtherPlayers = function(otherPlayer) {
+	// clear hit zone
+	state.hitZone = [];
 	const 
 		x1 = this.mainPlayer.x,
 		y1 = this.mainPlayer.y,
@@ -1073,7 +1103,8 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 		twoPI = Math.PI * 2;
 		rayAngleArray = this.rayAngleArray.slice(),
 		width = CONST.getWindowWidth(),
-		height = CONST.getWindowHeight();
+		height = CONST.getWindowHeight(),
+		jumpHeight = otherPlayer.currentJumpHeight;
 	let anotherPlayersAngleToMainPlayer;
 	// dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
 	if (dx === 0 && dy === 0) {
@@ -1147,8 +1178,15 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 			const ctx = document.getElementById('mainCanvas').getContext('2d');
 			ctx.fillStyle = 'red';
 			ctx.beginPath();
-			ctx.fillRect((otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2), (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight, playerCurrentWidth, playerCurrentHeight);
+			const 
+				drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
+				drawY = (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight - jumpHeight,
+				drawWidth = playerCurrentWidth,
+				drawHeight = playerCurrentHeight;
+			ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
 			ctx.fill();
+			// update hitZone
+			state.hitZone.push([otherPlayer.playerId, drawX, drawY, drawWidth, drawHeight]);
 		}
 	}
 
@@ -1286,12 +1324,16 @@ document.addEventListener('keyup', function(e) {
 }
 Game.prototype.play = function() {
 	game.initiateCanvas();
-	game.createPlayers();
+	game.createMainPlayer();
 	game.attachEventListeners();
 	serverConnection.initiateConnection();
 
 	const frame = () => {
 		this.mainPlayer.move();
+		if (state.isConnectedToServer) {
+			serverConnection.upLink();
+			this.updateOtherPlayers();
+		}
 		this.ray();
 		this.drawFrame();
 		requestAnimationFrame(frame);
@@ -1328,18 +1370,34 @@ ServerConnection.prototype.initiateConnection = function() {
 			state.updateServerMessage('Your ID is: ' + received.payload);
 			// start ping
 			this.ping();
+			// start upload data
+			state.isConnectedToServer = true;
+
 		} else if (received.type === 'pingBack') {
-			const latency = received.payload;
+			const pingSent = new Date(received.payload);
+			const now = new Date();
+			const latency = Math.floor((now - pingSent) / 2);
 			state.latency = latency + ' ms';
-			console.log(state.latency)
 			//
 			setTimeout(() => this.ping(), 1000);
+		} else if (received.type === 'downLink') {
+			state.playersArray = received.payload;
 		}
 	}
 }
 ServerConnection.prototype.ping = function() {
 	const now = new Date();
 	this.ws.send(JSON.stringify({type: 'ping', payload: now, playerId: state.playerId}));
+}
+ServerConnection.prototype.upLink = function() {
+	const player = game.mainPlayer;
+	const data = {
+		x: player.x,
+		y: player.y,
+		healthPoint: state.healthPoint,
+		currentJumpHeight: state.accumulatedJumpHeight,
+	};
+	this.ws.send(JSON.stringify({type: 'upLink', payload: data, playerId: state.playerId}));
 }
 
 function Loading() {
