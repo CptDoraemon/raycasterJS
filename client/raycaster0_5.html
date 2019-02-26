@@ -3,7 +3,7 @@
 <title>cs_assault by Raycaster</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <link rel="shortcut icon" href="./assets/favicon.ico">
-<link href="https://fonts.googleapis.com/css?family=Ubuntu" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,700" rel="stylesheet">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/solid.css" integrity="sha384-r/k8YTFqmlOaqRkZuSiE9trsrDXkh07mRaoGBMoDcmA58OHILZPsk29i2BsFng1B" crossorigin="anonymous">
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/fontawesome.css" integrity="sha384-4aon80D8rXCGx9ayDt85LbyUHeMWd3UiBaWliBlJ53yzm9hqN21A+o1pqoyK04h+" crossorigin="anonymous">
 <style>
@@ -17,7 +17,7 @@ body {
 	height: 100vh;
 	margin: 0;
 	overflow: hidden;
-	font-family: 'Ubuntu', sans-serif;
+	font-family: 'Roboto', sans-serif;
 }
 .loading-wrapper {
 	width: 300px;
@@ -161,7 +161,7 @@ body {
 	opacity: 1;
 	transition: 0.3s;
 }
-#settingDropdownItem1 {
+.settingDropdownItem {
 	height: 50px;
 	line-height: 50px;
 	width: calc(100% - 20px);
@@ -171,7 +171,7 @@ body {
 	align-items: center;
 	justify-content: center;
 }
-#settingDropdownItem1:hover {
+.settingDropdownItem:hover {
 	background-color: rgba(100,100,100,0.1);
 	cursor: pointer;
 }
@@ -223,7 +223,7 @@ body {
 }
 .serverMessageItemWrapper {
 	width: 100%;
-	font-family: 'Ubuntu', sans-serif;
+	font-family: 'Roboto', sans-serif;
 	color: rgba(255, 255, 0, 0.8); 
 	text-align: left;
 	font-size: 14px;
@@ -419,6 +419,8 @@ function State() {
 	this.playerId;
 	//
 	this.latency = 'pinging';
+	this.isDisplayingLatency = true;
+	this.isLowerGraphicQuality = false;
 }
 State.prototype.updateServerMessage = function(newMessage) {
 	const 
@@ -912,8 +914,9 @@ Game.prototype.drawFrame = function() {
 		height = CONST.getWindowHeight(),
 		ctx = document.getElementById('mainCanvas').getContext('2d');
 	ctx.clearRect(0, 0, width, height);
-
-//sky
+// resolution
+	param.resolution = state.isLowerGraphicQuality ? param.resolutionLow : param.resolutionHigh;
+// sky
 	const
 		sky = document.getElementById("sky"),
 		skyWidth = sky.width,
@@ -929,12 +932,12 @@ Game.prototype.drawFrame = function() {
 	if (direction >= 0.75) {
 		ctx.drawImage(sky, 0, 0, 0.25*skyWidth, skyHeight, (1-direction)/0.25*width, 0, width, 0.6*height);
 	}
-//floor
+// floor
 	ctx.beginPath();
 	ctx.fillStyle = 'rgba(150,150,150,1)';
 	ctx.fillRect(0, 0.5 * height, width, 0.5 * height);
 	ctx.fill();
-//wall
+// wall
 	const wallDistArray = this.wallDistArray.slice();
 	wallDistArray.map((i, index) => {
 		const 
@@ -1022,7 +1025,7 @@ Game.prototype.drawFrame = function() {
 		bulletDimension = gunWidth * 0.05;
 	state.emptyBullets.map((i) => {
 		ctx.drawImage(emptyBullet, 0, 0, emptyBulletWidth, emptyBulletHeight, i[0], i[1], bulletDimension, bulletDimension);
-	})
+	});
 
 	// reloading text
 	const flasingText = (messageString) => {
@@ -1040,14 +1043,21 @@ Game.prototype.drawFrame = function() {
 		ctx.fillStyle = "rgba(255, 0, 0, " + state.canvasCenterTextOpacity + ")";
 		ctx.textAlign = "center";
 		ctx.fillText(messageString, width * 0.5, height * 0.6); 
-	}
+	};
 	if (state.isReloading) {
 		flasingText('RELOADING')
-	}
+	};
 	// no ammo text
 	if (state.isShowingNoAmmoText) {
 		flasingText('RAN OUT OF AMMO')
-	}
+	};
+	// latency text
+	if (state.isDisplayingLatency) {
+		ctx.font = "300 10px Roboto";
+		ctx.fillStyle = "rgb(0, 0, 0)";
+		ctx.textAlign = "right";
+		ctx.fillText('ping: ' + state.latency, width, 10); 
+	};
 	// Minimap
 	this.drawMinimap();
 }
@@ -1290,11 +1300,12 @@ Game.prototype.play = function() {
 }
 function ServerConnection() {
 	this.lastPing;
+	this.ws;
 }
 ServerConnection.prototype.initiateConnection = function() {
 	const HOST = location.origin.replace(/^http/, 'ws')
 	const ws = new WebSocket(HOST);
-	const ping = this.ping;
+	this.ws = ws;
 
 	ws.onopen = function() {
 		state.updateServerMessage('Connected to the server');
@@ -1306,7 +1317,7 @@ ServerConnection.prototype.initiateConnection = function() {
 		ws.send(JSON.stringify(requestJoinGame));
 	};
 
-	ws.onmessage = function(e) {
+	ws.onmessage = (e) => {
 		const received = JSON.parse(e.data);
 		if (received.type === 'serverMessage') {
 			// serverMessage that need to be post to serverMessageComponent
@@ -1314,23 +1325,21 @@ ServerConnection.prototype.initiateConnection = function() {
 		} else if (received.type === 'playerId') {
 			// set _id for this player
 			state.playerId = received.payload;
+			state.updateServerMessage('Your ID is: ' + received.payload);
+			// start ping
+			this.ping();
 		} else if (received.type === 'pingBack') {
-			const whenDidThisPingSent = new Date(received.payload);
-			if (whenDidThisPingSent === this.lastPing) {
-				const now = new Date();
-				state.latency = now - whenDidThisPingSent + ' ms';
-			} else {
-				state.latency = 'packet loss'
-			}
+			const latency = received.payload;
+			state.latency = latency + ' ms';
+			console.log(state.latency)
+			//
+			setTimeout(() => this.ping(), 1000);
 		}
 	}
 }
-ServerConnection.prototype.ping = function(ws) {
+ServerConnection.prototype.ping = function() {
 	const now = new Date();
-	this.lastPing = now;
-	ws.send(JSON.stringify({type: 'ping', payload: now}));
-	console.log(state.latency)
-	setTimeout(this.ping, 1000);
+	this.ws.send(JSON.stringify({type: 'ping', payload: now, playerId: state.playerId}));
 }
 
 function Loading() {
@@ -1515,25 +1524,35 @@ function ToolBarComponent() {
 		div.id = id;
 		return div;
 	}
+	const settingItems = [];
+	const createSettingItem = (settingItemsArray, text, statePropertyString, initiateIsON) => {
+		const number = settingItemsArray.length;
+		const item = createDiv('settingDropdownItem' + number);
+		item.className = 'settingDropdownItem';
+		const onHandler = () => {
+			item.innerHTML = '<span>' + text + ' <i class="fas fa-toggle-on" style="color: green; font-size: 24px; top: .125em; position: relative""></i></span>';
+			state[statePropertyString] = true;
+		};
+		const offHandler = () => {
+			item.innerHTML = '<span>' + text + ' <i class="fas fa-toggle-off" style="color: rgba(0,0,0,0.5); font-size: 24px; top: .125em; position: relative"></i></span>';
+			state[statePropertyString] = false;
+		}
+		initiateIsON ? onHandler() : offHandler();
+		item.onclick = (e) => {
+			e.stopPropagation();
+			state[statePropertyString] ? offHandler() : onHandler();
+		};
+		settingItemsArray.push(item);
+	};
 	const 
 		toolBarComponent = createDiv('toolBarComponent'),
 		info = createDiv('info'),
 		setting = createDiv('setting'),
 		settingDropdown = createDiv('settingDropdown');
-		settingDropdownItem1 = createDiv('settingDropdownItem1');
+	createSettingItem(settingItems, 'Lower graphic quality', 'isLowerGraphicQuality', false);
+	createSettingItem(settingItems, 'Display latency', 'isDisplayingLatency', true);
 	info.innerHTML = '<span><i class="fas fa-info-circle"></i></span>';
 	setting.innerHTML = '<span><i class="fas fa-cog"></i></span>';
-	const graphicToggleOn = () => {
-		settingDropdownItem1.innerHTML = '<span>Lower graphic quality <i class="fas fa-toggle-on" style="color: green; font-size: 24px; top: .125em; position: relative""></i></span>';
-		this.isLowerGraphicQuality = true;
-		param.resolution = param.resolutionLow;
-	}
-	const graphicToggleOff = () => {
-		settingDropdownItem1.innerHTML = '<span>Lower graphic quality <i class="fas fa-toggle-off" style="color: rgba(0,0,0,0.5); font-size: 24px; top: .125em; position: relative"></i></span>';
-		this.isLowerGraphicQuality = false;
-		param.resolution = param.resolutionHigh;
-	}
-	graphicToggleOff();
 
 	info.onclick = () => {
 		const event = new Event('keydown');
@@ -1543,10 +1562,6 @@ function ToolBarComponent() {
 	setting.onclick = () => {
 		this.isSettingDropdownActive ? this.closeSettingDropdown() : this.openSettingDropdown();
 	}
-	settingDropdownItem1.onclick = (e) => {
-		e.stopPropagation();
-		this.isLowerGraphicQuality ? graphicToggleOff() : graphicToggleOn();
-	}
 	settingDropdown.onmouseleave = () => {
 		this.closeSettingDropdown()
 	}
@@ -1554,12 +1569,11 @@ function ToolBarComponent() {
 	setting.appendChild(settingDropdown);
 	toolBarComponent.appendChild(info);
 	toolBarComponent.appendChild(setting);
-	settingDropdown.appendChild(settingDropdownItem1);
+	settingItems.map(item => settingDropdown.appendChild(item));
 
 	this.component = toolBarComponent;
 	this.settingDropdownComponent = settingDropdown;
 	this.isSettingDropdownActive = false;
-	this.isLowerGraphicQuality = false;
 }
 ToolBarComponent.prototype.mountComponent = function() {
 	const rootDiv = document.getElementById('root');

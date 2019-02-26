@@ -33,7 +33,6 @@ function State() {
 	// 	lastPing: new Date(),
 	// };
 	this.playersArray = [];
-	this.newPlayerId = 1;
 	this.isCheckPing = false;
 }
 const state = new State();
@@ -72,7 +71,7 @@ function checkPing() {
 
 function newPlayerJoin(ws) {
 	// create newPlayerObj, send playerId back to client
-	const playerId = state.newPlayerId;
+	const playerId = (+new Date).toString(36).slice(-8);
 	ws.send(JSON.stringify({type: 'playerId', payload: playerId}));
 	const newPlayerObj = {
 		playerId: playerId,
@@ -83,7 +82,6 @@ function newPlayerJoin(ws) {
 		lastPing: new Date(),
 	};
 	state.playersArray.push(newPlayerObj);
-	state.newPlayerId++;
 
 	// send playerCount message
 	const playerCount = state.playersArray.length;
@@ -100,10 +98,14 @@ function newPlayerJoin(ws) {
 function handlePing(ws, message) {
 	const playerId = message.playerId;
 	const now = new Date();
+	const whenPinged = new Date(message.payload);
+	const latency = now - whenPinged;
 
-	this.playersArray.map((playerObj) => {
+	state.playersArray.map((playerObj) => {
 		if (playerObj.playerId === playerId) {
-			playerObj.lastPing  = now
+			playerObj.lastPing = now
 		}
-	})
+	});
+	// ping back
+	ws.send(JSON.stringify({type: 'pingBack', payload: latency}));
 }
