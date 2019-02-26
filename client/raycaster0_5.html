@@ -402,6 +402,7 @@ function State() {
 	this.thisRoundFiringFinished = true;
 	this.bulletHitX;
 	this.bulletHitY;
+	this.bulletHitConfirmed; /* used to change crater color */
 	//
 	this.canvasCenterTextOpacity = 1;
 	this.canvasCenterTextOpacitySign = -1;
@@ -428,6 +429,8 @@ function State() {
 	// hitZone will only be push into array if it was drawn (guaranteed in sight) on frame, this array is cleared on the beginning of draw other players.
 	this.hitZone = [];
 	this.hitPlayerArray /* the id of the other players being hit by this player in a frame */ = [];
+	//
+	this.isRespawning = false;
 }
 State.prototype.updateServerMessage = function(newMessage) {
 	const 
@@ -514,13 +517,10 @@ const
 	game = new Game(),
 	serverConnection = new ServerConnection();
 
-function Player(x, y, healthPoint, currentJumpHeight) {
-	const CTRespawn = [[3, 10], [3, 15], [3, 20], [3, 25], [3, 30]];
-	const TRespawn = [[25, 16], [25, 27], [26, 17], [34, 16], [34, 17]];
-	const isCT = (Math.random() > 0.5);
-	const respawnPos = Math.floor(Math.random() * 5);
-	this.x /* init coordinate x */ = x ? x : isCT ? CTRespawn[respawnPos][0] : TRespawn[respawnPos][0];
-	this.y /* init coordinate y */ = y ? y : isCT ? CTRespawn[respawnPos][1] : TRespawn[respawnPos][1];
+function Player() {
+	this.isCT = (Math.random() > 0.5);
+	this.x /* init coordinate x */ ;
+	this.y /* init coordinate y */ ;
 	this.alpha /* init direction angle, relative to positive x axis */ = Math.random() > 0.5 ? (-0.75 * Math.PI * 2) /* up */: (0.25 * Math.PI * 2) /* down */;
 	this.forward = false;
 	this.backward = false;
@@ -532,9 +532,20 @@ function Player(x, y, healthPoint, currentJumpHeight) {
 	this.totalMagzine = 120;
 	// related to jump function
 	this.gravity = param.getGravity();
-	//
-	if (healthPoint) this.healthPoint = healthPoint;
-	if (currentJumpHeight) this.currentJumpHeight = currentJumpHeight;
+}
+Player.prototype.respawn = function() {
+	state.healthPoint = param.healthPointMax;
+	const hpEl = document.getElementById('playerStatusHealthPoint');
+	hpEl.innerHTML = state.healthPoint;
+
+	const CTRespawn = [[3, 10], [3, 15], [3, 20], [3, 25], [3, 30]];
+	const TRespawn = [[25, 16], [25, 27], [26, 17], [34, 16], [34, 17]];
+	const respawnPos = Math.floor(Math.random() * 5);
+	this.x = this.isCT ? CTRespawn[respawnPos][0] : TRespawn[respawnPos][0];
+	this.y = this.isCT ? CTRespawn[respawnPos][1] : TRespawn[respawnPos][1];
+
+	// respawned
+	if (state.isRespawning) state.isRespawning = false;
 }
 Player.prototype.move = function() {
 	// update player coordinate
@@ -631,6 +642,7 @@ Player.prototype.move = function() {
 			const bulletHitY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * recoil;
 			state.bulletHitX = bulletHitX;
 			state.bulletHitY = bulletHitY;
+			state.bulletHitConfirmed = false;
 			// check hit
 			if (state.hitZone.length) {
 				state.hitZone.map(i => {
@@ -638,7 +650,8 @@ Player.prototype.move = function() {
 					const isHit = (i[1] < bulletHitX) && (bulletHitX < (i[1] + i[3])) && (i[2] < bulletHitY) && (bulletHitY < (i[2] + i[4]));
 					if (isHit) {
 						console.log('you hit player ' + i[0]);
-						state.hitPlayerArray.push(i[0])
+						state.hitPlayerArray.push(i[0]);
+						state.bulletHitConfirmed = true;
 					}
 				});
 			}
@@ -753,6 +766,7 @@ Game.prototype.initiateCanvas = function() {
 };
 Game.prototype.createMainPlayer = function() {
 	this.mainPlayer = new Player();
+	this.mainPlayer.respawn();
 };
 Game.prototype.ray = function() {
 	//Prepare rayArray
@@ -1036,7 +1050,7 @@ Game.prototype.drawFrame = function() {
 		ctx.rotate(-state.muzzelRotate);
 		ctx.translate(-muzzleCenterX, -muzzleCenterY);
 		// draw crater
-		ctx.fillStyle = 'rgb(0,0,0)';
+		ctx.fillStyle = state.bulletHitConfirmed ? 'rgb(255,0,0)' : 'rgb(0,0,0)';
 		ctx.beginPath();
 		ctx.arc(state.bulletHitX, state.bulletHitY, 2, 0, 2 * Math.PI);
 		ctx.fill();
@@ -1177,7 +1191,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 		if (z < wallDistAtThisPos) {
 			// check if another player is blocked by wall is HERE!!
 			const ctx = document.getElementById('mainCanvas').getContext('2d');
-			ctx.fillStyle = 'red';
+			ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
 			ctx.beginPath();
 			const 
 				drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
@@ -1187,7 +1201,9 @@ Game.prototype.drawOtherPlayers = function(otherPlayer) {
 			ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
 			ctx.fill();
 			// update hitZone
-			state.hitZone.push([otherPlayer.playerId, drawX, drawY, drawWidth, drawHeight]);
+			if (!otherPlayer.isRespawning) {
+				state.hitZone.push([otherPlayer.playerId, drawX, drawY, drawWidth, drawHeight]);
+			}
 		}
 	}
 
@@ -1335,11 +1351,9 @@ Game.prototype.frame = function() {
 	if (state.healthPoint > 0) {
 		requestAnimationFrame(this.frame);
 	} else {
+		if (!state.isRespawning) state.isRespawning = true;
 		setTimeout(() => {
-			state.healthPoint = param.healthPointMax;
-			const hpEl = document.getElementById('playerStatusHealthPoint');
-			hpEl.innerHTML = state.healthPoint;
-			this.createMainPlayer();
+			this.mainPlayer.respawn();
 			requestAnimationFrame(this.frame);
 		}, 5000)
 	}
@@ -1412,6 +1426,7 @@ ServerConnection.prototype.initiateConnection = function() {
 		}
 	}
 
+	ws.onerror = (e) => console.log(e);
 	ws.onclose = () => {
 		state.updateServerMessage('Connection lost. Please refresh the page to reconnect.');
 		state.isConnectedToServer = false;
@@ -1428,7 +1443,8 @@ ServerConnection.prototype.upLink = function() {
 		y: player.y,
 		healthPoint: state.healthPoint,
 		currentJumpHeight: state.accumulatedJumpHeight,
-		hit: state.hitPlayerArray.slice()
+		hit: state.hitPlayerArray.slice(),
+		isRespawning: state.isRespawning
 	};
 	this.ws.send(JSON.stringify({type: 'upLink', payload: data, playerId: state.playerId}));
 	if (state.hitPlayerArray.length !== 0) {

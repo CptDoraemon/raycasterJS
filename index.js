@@ -44,7 +44,8 @@ State.prototype.preparePlayersArrayForDownLink = function() {
 			x: obj.x,
 			y: obj.y,
 			healthPoint: obj.healthPoint,
-			currentJumpHeight: obj.currentJumpHeight
+			currentJumpHeight: obj.currentJumpHeight,
+			isRespawning: obj.isRespawning
 		}
 		result.push(processedObj)
 	});
@@ -69,6 +70,14 @@ wss.on('connection', (ws) => {
 		} else if (message.type === 'upLink') {
 			handleUpLink(ws, message, wss);
 		}
+	});
+
+	ws.on('error', (e) => {
+		console.log(e)
+	});
+
+	ws.on('close', (e) => {
+		ws.close()
 	});
 });
 
@@ -132,7 +141,7 @@ function newPlayerJoin(ws, wss) {
 		playerId: playerId,
 		x: 0,
 		y: 0,
-		healthPoint: 0,
+		healthPoint: 100,
 		currentJumpHeight: 0,
 		lastPing: new Date(),
 		ws: ws
@@ -142,7 +151,7 @@ function newPlayerJoin(ws, wss) {
 	// send playerCount message
 	const playerCount = state.playersArray.length;
 	const message = playerCount === 1 ? 
-		'You are the only player online at this moment. (Duplicate this tab can create another player)' : 
+		'You are the only player online at this moment. (Wanna have some fun? Duplicate this tab can create another player)' : 
 		'There are ' + playerCount + ' players online';
 	ws.send(JSON.stringify({type: 'serverMessage', payload: message}));
 
@@ -183,18 +192,23 @@ function handleUpLink(ws, message, wss) {
 			playerObj.y = data.y;
 			playerObj.currentJumpHeight = data.currentJumpHeight;
 			playerObj.healthPoint = data.healthPoint;
+			playerObj.isRespawning = data.isRespawning;
 		}
 		// hit minus hp
-		if (data.hit.indexOf(playerObj.playerId) !== -1) {
+		if ((data.hit.indexOf(playerObj.playerId) !== -1) && !playerObj.isRespawning) {
 			const damage = Math.floor(Math.random() * 10 + 5);
 			const hpAfterDamage = playerObj.healthPoint - damage;
 			if (hpAfterDamage > 0) {
 				playerObj.healthPoint = hpAfterDamage
 			} else if (hpAfterDamage <= 0){
+				const killerWs = state.playersArray.filter((obj) => obj.playerId === playerId)[0].ws;
 				playerObj.healthPoint = 0;
+				playerObj.isRespawning = true;
 				wss.clients.forEach((client) => {
 					if (client === playerObj.ws) {
 						client.send(JSON.stringify({type: 'serverMessage', payload: 'You were killed by ' + playerId}));
+					} else if (client === killerWs) {
+						client.send(JSON.stringify({type: 'serverMessage', payload: 'You killed ' + playerId}));
 					} else {
 						client.send(JSON.stringify({type: 'serverMessage', payload: playerId + ' killed ' + playerObj.playerId}));
 					}
@@ -204,9 +218,7 @@ function handleUpLink(ws, message, wss) {
 	});
 
 	wss.clients.forEach((client) => {
-		if (client !== ws) {
-			client.send(JSON.stringify({type: 'downLink', payload: state.preparePlayersArrayForDownLink()}));
-		}
+		client.send(JSON.stringify({type: 'downLink', payload: state.preparePlayersArrayForDownLink()}));
 	});
 }
 
