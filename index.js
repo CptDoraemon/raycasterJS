@@ -35,6 +35,21 @@ function State() {
 	this.playersArray = [];
 	this.isCheckTimeout = false;
 }
+State.prototype.preparePlayersArrayForDownLink = function() {
+	const array = this.playersArray.slice();
+	const result = [];
+	array.map(obj => {
+		const processedObj = {
+			playerId: obj.playerId,
+			x: obj.x,
+			y: obj.y,
+			healthPoint: obj.healthPoint,
+			currentJumpHeight: obj.currentJumpHeight
+		}
+		result.push(processedObj)
+	});
+	return result;
+}
 const state = new State();
 
 wss.on('connection', (ws) => {
@@ -79,13 +94,31 @@ function checkTimeout() {
 		const now = new Date();
 		const timeoutMax = 30 * 1000;
 		let playersArray = state.playersArray.slice();
-		console.log('online player count: ' + playersArray.length);
+		let playerCount = playersArray.length;
+		let needSendDownLink = false;
+		console.log('online player count: ' + playerCount);
 		playersArray = playersArray.filter((playerObj) => {
 			const lastPing = new Date(playerObj.lastPing);
 			const timeDiff = now - lastPing;
+			const isTimeout = (timeDiff > timeoutMax);
+			if (isTimeout) {
+				playerCount--;
+				wss.clients.forEach(client => {
+					if (client !== playerObj.ws) {
+						client.send(JSON.stringify({type: 'serverMessage', payload: 'Player ' + playerObj.playerId + ' has disconnected. There are ' + playerCount + ' players online.'}));
+					}
+				});
+				playerObj.ws.close();
+				needSendDownLink = true;
+			}
 			return timeDiff < timeoutMax;
 		});
 		state.playersArray = playersArray;
+		if (needSendDownLink) {
+			wss.clients.forEach((client) => {
+				client.send(JSON.stringify({type: 'downLink', payload: state.preparePlayersArrayForDownLink()}));
+			});
+		}
 		// check every second
 		setTimeout(checkTimeout, 1000);
 	}
@@ -102,12 +135,15 @@ function newPlayerJoin(ws, wss) {
 		healthPoint: 0,
 		currentJumpHeight: 0,
 		lastPing: new Date(),
+		ws: ws
 	};
 	state.playersArray.push(newPlayerObj);
 
 	// send playerCount message
 	const playerCount = state.playersArray.length;
-	const message = playerCount === 1 ? 'You are the only player online at this moment' : 'There are ' + playerCount + ' players online';
+	const message = playerCount === 1 ? 
+		'You are the only player online at this moment. (Duplicate this tab can create another player)' : 
+		'There are ' + playerCount + ' players online';
 	ws.send(JSON.stringify({type: 'serverMessage', payload: message}));
 
 	// broadcast new player join to other clients
@@ -148,10 +184,29 @@ function handleUpLink(ws, message, wss) {
 			playerObj.currentJumpHeight = data.currentJumpHeight;
 			playerObj.healthPoint = data.healthPoint;
 		}
+		// hit minus hp
+		if (data.hit.indexOf(playerObj.playerId) !== -1) {
+			const damage = Math.floor(Math.random() * 10 + 5);
+			const hpAfterDamage = playerObj.healthPoint - damage;
+			if (hpAfterDamage > 0) {
+				playerObj.healthPoint = hpAfterDamage
+			} else if (hpAfterDamage <= 0){
+				playerObj.healthPoint = 0;
+				wss.clients.forEach((client) => {
+					if (client === playerObj.ws) {
+						client.send(JSON.stringify({type: 'serverMessage', payload: 'You were killed by ' + playerId}));
+					} else {
+						client.send(JSON.stringify({type: 'serverMessage', payload: playerId + ' killed ' + playerObj.playerId}));
+					}
+				});
+			}
+		}
 	});
+
 	wss.clients.forEach((client) => {
 		if (client !== ws) {
-			client.send(JSON.stringify({type: 'downLink', payload: state.playersArray.slice()}));
+			client.send(JSON.stringify({type: 'downLink', payload: state.preparePlayersArrayForDownLink()}));
 		}
 	});
 }
+

@@ -427,6 +427,7 @@ function State() {
 	this.isConnectedToServer = false;
 	// hitZone will only be push into array if it was drawn (guaranteed in sight) on frame, this array is cleared on the beginning of draw other players.
 	this.hitZone = [];
+	this.hitPlayerArray /* the id of the other players being hit by this player in a frame */ = [];
 }
 State.prototype.updateServerMessage = function(newMessage) {
 	const 
@@ -636,9 +637,10 @@ Player.prototype.move = function() {
 					// [otherplayer.playerId, drawX. drawY, drawWidth, drawHeight]
 					const isHit = (i[1] < bulletHitX) && (bulletHitX < (i[1] + i[3])) && (i[2] < bulletHitY) && (bulletHitY < (i[2] + i[4]));
 					if (isHit) {
-						console.log('you hit player ' + i[0])
+						console.log('you hit player ' + i[0]);
+						state.hitPlayerArray.push(i[0])
 					}
-				})
+				});
 			}
 			// update text
 			currentMagzineText.innerHTML = state.currentMagzine;
@@ -1086,12 +1088,11 @@ Game.prototype.drawFrame = function() {
 }
 Game.prototype.updateOtherPlayers = function() {
 	let array = state.playersArray.slice();
-	array = array.filter((obj) => obj.playerId !== state.playerId);
 	this.otherPlayers = array;
-}
-Game.prototype.drawOtherPlayers = function(otherPlayer) {
 	// clear hit zone
 	state.hitZone = [];
+}
+Game.prototype.drawOtherPlayers = function(otherPlayer) {
 	const 
 		x1 = this.mainPlayer.x,
 		y1 = this.mainPlayer.y,
@@ -1322,23 +1323,35 @@ document.addEventListener('keyup', function(e) {
 					}
 })
 }
+Game.prototype.frame = function() {
+	this.mainPlayer.move();
+	if (state.isConnectedToServer) {
+		serverConnection.upLink();
+		this.updateOtherPlayers();
+	}
+	this.ray();
+	this.drawFrame();
+
+	if (state.healthPoint > 0) {
+		requestAnimationFrame(this.frame);
+	} else {
+		setTimeout(() => {
+			state.healthPoint = param.healthPointMax;
+			const hpEl = document.getElementById('playerStatusHealthPoint');
+			hpEl.innerHTML = state.healthPoint;
+			this.createMainPlayer();
+			requestAnimationFrame(this.frame);
+		}, 5000)
+	}
+}
 Game.prototype.play = function() {
 	game.initiateCanvas();
 	game.createMainPlayer();
 	game.attachEventListeners();
 	serverConnection.initiateConnection();
 
-	const frame = () => {
-		this.mainPlayer.move();
-		if (state.isConnectedToServer) {
-			serverConnection.upLink();
-			this.updateOtherPlayers();
-		}
-		this.ray();
-		this.drawFrame();
-		requestAnimationFrame(frame);
-	}
-	requestAnimationFrame(frame);
+	this.frame = this.frame.bind(this);
+	requestAnimationFrame(this.frame);
 }
 function ServerConnection() {
 	this.lastPing;
@@ -1381,8 +1394,27 @@ ServerConnection.prototype.initiateConnection = function() {
 			//
 			setTimeout(() => this.ping(), 1000);
 		} else if (received.type === 'downLink') {
-			state.playersArray = received.payload;
+			const playersArray = [];
+			const receivedArray = received.payload.slice();
+			receivedArray.map(obj => {
+				if (obj.playerId !== state.playerId) {
+					playersArray.push(obj)
+				} else if (obj.playerId === state.playerId){
+					// update this player's hp
+					if (state.healthPoint !== obj.healthPoint) {
+						state.healthPoint = obj.healthPoint;
+						const hpEl = document.getElementById('playerStatusHealthPoint');
+						hpEl.innerHTML = state.healthPoint;
+					}
+				}
+			})
+			state.playersArray = playersArray;
 		}
+	}
+
+	ws.onclose = () => {
+		state.updateServerMessage('Connection lost. Please refresh the page to reconnect.');
+		state.isConnectedToServer = false;
 	}
 }
 ServerConnection.prototype.ping = function() {
@@ -1396,8 +1428,12 @@ ServerConnection.prototype.upLink = function() {
 		y: player.y,
 		healthPoint: state.healthPoint,
 		currentJumpHeight: state.accumulatedJumpHeight,
+		hit: state.hitPlayerArray.slice()
 	};
 	this.ws.send(JSON.stringify({type: 'upLink', payload: data, playerId: state.playerId}));
+	if (state.hitPlayerArray.length !== 0) {
+		state.hitPlayerArray = []
+	}
 }
 
 function Loading() {
@@ -1667,7 +1703,7 @@ PlayerStatusComponent.prototype.mountComponent = function() {
 					'<i class="fas fa-times-circle"></i>' +
 				'</div>' +
 				'<div class="playerStatusValue">' +
-					'<span id="plaerStatusHealthPoint">' + state.healthPoint + '</span>' +
+					'<span id="playerStatusHealthPoint">' + state.healthPoint + '</span>' +
 				'</div>' +
 			'</div>' +
 			'<div class="playerStatusGroupWrapper">' +
