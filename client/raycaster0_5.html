@@ -1358,10 +1358,10 @@ Game.prototype.frame = function() {
 	this.ray();
 	this.drawFrame();
 
-	if (state.healthPoint > 0) {
+	if (!state.isRespawning) {
 		requestAnimationFrame(this.frame);
 	} else {
-		if (!state.isRespawning) state.isRespawning = true;
+		// state.isRespawning changed in serverconnection handledownlinkhitby
 		const doRespawan = () => {
 			this.mainPlayer.respawn();
 			requestAnimationFrame(this.frame);
