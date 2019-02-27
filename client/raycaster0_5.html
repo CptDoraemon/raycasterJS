@@ -255,7 +255,8 @@ a:hover {
 			sky: './assets/sky.jpg',
 			gun: './assets/gun.png',
 			muzzle: './assets/muzzle.png',
-			emptyBullet: './assets/bullet.png'
+			emptyBullet: './assets/bullet.png',
+			soilder: './assets/soilder.png'
 		};
 	GlobalVar.prototype.getWindowWidth = function() {
 		return width
@@ -266,6 +267,11 @@ a:hover {
 	GlobalVar.prototype.getAssetsUrlObj = function(){
 		this.assetsCount = Object.keys(assetsUrlObj).length;
 		return assetsUrlObj
+	}
+	GlobalVar.prototype.remapAngleToZeroToTwoPI = function(angle) {
+		const twoPI = Math.PI * 2;
+		let a = angle % twoPI;
+		return a > 0 ? a : twoPI + a
 	}
 })();
 const CONST = new GlobalVar();
@@ -431,6 +437,8 @@ function State() {
 	this.hitPlayerArray /* the id of the other players being hit by this player in a frame */ = [];
 	//
 	this.isRespawning = false;
+	//
+	this.damageIndicator = [];
 }
 State.prototype.updateServerMessage = function(newMessage) {
 	const 
@@ -733,15 +741,20 @@ function Game() {
 	this.mainPlayer;
 	this.otherPlayers = [];
 	//
-	this.wallDistArray;
-	this.hitWallTypeArray;
-	this.hitDirectionArray;
-	this.rayAngleArray;
-	this.wallDistArrayBeforeFishEyeCorrection; // for drawing ray on minimap
+	this.wallDistArray = [];
+	this.hitWallTypeArray = [];
+	this.hitDirectionArray = [];
+	this.rayAngleArray = [];
+	this.wallDistArrayBeforeFishEyeCorrection = []; // for drawing ray on minimap
 	this.fov = Math.PI / 3; //60 degree
 	this.dAlpha; /* angle between rays */
 	// get vars from param
 	this.mapGrid = param.getMapGrid();
+	//
+	this.drawDamageIndicatorArray = [];
+	//
+	this.deathTimeStamp; // used in respawn frame
+	this.respawnFramethrottler = 1;
 	//
 	this.miniMapSizeMax = param.getMiniMapSizeMax();
 	this.miniMapSizeMin = param.getMiniMapSizeMin();
@@ -1007,7 +1020,11 @@ Game.prototype.drawFrame = function() {
 	})
 
 	// otherplayer
-	this.otherPlayers.map(otherplayer => this.drawOtherPlayers(otherplayer));
+	this.otherPlayers.map(otherplayer => {
+			if (otherplayer.isInSight) {
+				this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance, width, height)
+			}
+		});
 
 	// crosshair
 	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || state.currentJumpVelocity;
@@ -1106,6 +1123,76 @@ Game.prototype.drawFrame = function() {
 		ctx.textAlign = "right";
 		ctx.fillText('ping: ' + state.latency, width, 10); 
 	};
+	// damage indicator
+	if(state.damageIndicator.length !== 0) {
+		//
+		const otherPlayerAngleArray = [];
+		const otherPlayersArray = this.otherPlayers.slice();
+		otherPlayersArray.map(obj => {
+			if (state.damageIndicator.indexOf(obj.playerId) !== -1) {
+				otherPlayerAngleArray.push(obj.anotherPlayersAngleToMainPlayer)
+			}
+		})
+		let mainPlayerFacing = this.mainPlayer.alpha;
+		mainPlayerFacing = CONST.remapAngleToZeroToTwoPI(mainPlayerFacing);
+		let diff = mainPlayerFacing - otherPlayerAngleArray[0];
+		diff = CONST.remapAngleToZeroToTwoPI(diff);
+
+		const calcDirection = (diff, fov) => {
+			const twoPI = Math.PI * 2;
+			const halfFov = 0.5 * fov;
+			if ((-halfFov + twoPI < diff && diff <= twoPI) || (0 <= diff && diff <= halfFov)) {
+				return 'front'
+			} else if (halfFov < diff && diff <= 0.375 * twoPI) {
+				return 'left'
+			} else if (0.375 * twoPI < diff && diff <= 0.625 * twoPI) {
+				return 'back'
+			} else if (0.625 * twoPI < diff && diff <= -halfFov + twoPI) {
+				return 'right'
+			}
+		}
+
+		otherPlayerAngleArray.map(otherPlayerAngle => {
+			let diff = mainPlayerFacing - otherPlayerAngle;
+			diff = CONST.remapAngleToZeroToTwoPI(diff);
+			const obj = {
+				direction: calcDirection(diff, this.fov),
+				date: new Date()
+			};
+			this.drawDamageIndicatorArray.push(obj)
+		});
+		//
+		state.damageIndicator = [];
+	};
+	if (this.drawDamageIndicatorArray.length !== 0) {
+		ctx.strokeStyle = 'rgba(255,0,0,0.3)';
+		ctx.lineWidth = 0.05 * height;
+		this.drawDamageIndicatorArray.map(obj => {
+			const direction = obj.direction;
+			const twoPI = Math.PI * 2;
+			ctx.beginPath();
+			if (direction === 'front') {
+				start = -0.375 * twoPI;
+			} else if (direction === 'right') {
+				start = -0.125 * twoPI;
+			} else if (direction === 'back') {
+				start = 0.125 * twoPI;
+			} else if (direction === 'left') {
+				start = 0.375 * twoPI;
+			} 
+			end = start + 0.25 * twoPI;
+			ctx.arc(0.5 * width, 0.5 * height, 0.2 * height, start, end);
+			ctx.stroke();	
+		});
+		ctx.lineWidth = 1;
+
+		// filter out old damage indicator
+		const now = new Date();
+		this.drawDamageIndicatorArray = this.drawDamageIndicatorArray.filter(obj => {
+			const start = new Date(obj.date);
+			return now - start < 1000
+		});
+	}
 	// Minimap
 	this.drawMinimap();
 }
@@ -1114,112 +1201,134 @@ Game.prototype.updateOtherPlayers = function() {
 	this.otherPlayers = array;
 	// clear hit zone
 	state.hitZone = [];
-}
-Game.prototype.drawOtherPlayers = function(otherPlayer) {
-	const 
-		x1 = this.mainPlayer.x,
-		y1 = this.mainPlayer.y,
-		x2 = otherPlayer.x,
-		y2 = otherPlayer.y,
-		dx = x2 - x1,
-		dy = y2 - y1,
-		z = Math.pow(dx*dx + dy*dy, 0.5),
-		twoPI = Math.PI * 2;
-		rayAngleArray = this.rayAngleArray.slice(),
-		width = CONST.getWindowWidth(),
-		height = CONST.getWindowHeight(),
-		jumpHeight = otherPlayer.currentJumpHeight;
-	let anotherPlayersAngleToMainPlayer;
-	// dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
-	if (dx === 0 && dy === 0) {
-		anotherPlayersAngleToMainPlayer = 0;
-	} else if (dx === 0) {
-		if (dy > 0) {
-			anotherPlayersAngleToMainPlayer = 0.25 * twoPI
-		} else if (dy < 0) {
-			anotherPlayersAngleToMainPlayer = 0.75 * twoPI
-		}
-	} else if (dy === 0) {
-		if (dx > 0) {
-			anotherPlayersAngleToMainPlayer = 0
-		} else if (dx < 0){
-			anotherPlayersAngleToMainPlayer = 0.5 * twoPI
-		}
-	} else if (dx > 0 && dy > 0) {
-		anotherPlayersAngleToMainPlayer = Math.atan(dy / dx);
-	} else if (dx < 0 && dy > 0) {
-		anotherPlayersAngleToMainPlayer = twoPI * 0.5 - Math.atan(dy / -dx);
-	} else if (dx < 0 && dy < 0) {
-		anotherPlayersAngleToMainPlayer = Math.atan(-dy / -dx) + twoPI * 0.5;
-	} else if (dx > 0 && dy < 0) {
-		anotherPlayersAngleToMainPlayer = twoPI - Math.atan(-dy / dx);
-	} 
-	anotherPlayersAngleToMainPlayer = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer);
-
-	function remapAngleToZeroToTwoPI(angle) {
-		const twoPI = Math.PI * 2;
-		let a = angle % twoPI;
-		return a > 0 ? a : twoPI + a
-	}
-	function checkIfAnotherPlayerIsInSight(sightStartAngle, sightEndAngle, fov, anotherPlayersAngleToMainPlayer) {
-		const end = remapAngleToZeroToTwoPI(sightEndAngle);
-		let start = remapAngleToZeroToTwoPI(sightStartAngle); 
-		//console.log(start * 360 / Math.PI / 2, end * 360 / Math.PI / 2, anotherPlayersAngleToMainPlayer* 360 / Math.PI / 2)
-		if (end < fov) {
-			if ((start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < Math.PI * 2) || (0 < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end)) {
-				return true
-			} else {
-				return false
-			}
-		} else {
-			if (start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end) {
-				return true;
-			} else {
-				return false;
-			}
-		}
-	}
-	const drawOtherPlayer = (otherPlayer, anotherPlayersAngleToMainPlayer) => {
-		const 
-			playerMaxWidth = 500,
-			playerMaxHeight = 800,
-			distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
-			playerCurrentWidth = playerMaxWidth / z,
-			playerCurrentHeight = playerMaxHeight / z;
-
-		const end = remapAngleToZeroToTwoPI(rayAngleArray[rayAngleArray.length - 1]);
-		let start = remapAngleToZeroToTwoPI(rayAngleArray[0]); 
-		let player1PosOnScreen;
-
-		if (anotherPlayersAngleToMainPlayer < start) {
-			// this function is called when another player is garanteed in sight
-			anotherPlayersAngleToMainPlayer += Math.PI * 2
-		}
-		otherPlayerPosOnScreen = Math.floor((anotherPlayersAngleToMainPlayer - start) / this.dAlpha);
-		const wallDistAtThisPos = this.wallDistArrayBeforeFishEyeCorrection[otherPlayerPosOnScreen];
-		if (z < wallDistAtThisPos) {
-			// check if another player is blocked by wall is HERE!!
-			const ctx = document.getElementById('mainCanvas').getContext('2d');
-			ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
-			ctx.beginPath();
+// modify the object, add property anotherPlayersAngleToMainPlayer, isInSight, distance
+	const appendProperties = (otherPlayer) => {
 			const 
-				drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
-				drawY = (height - playerCurrentHeight) / 2 + state.accumulatedJumpHeight - jumpHeight,
-				drawWidth = playerCurrentWidth,
-				drawHeight = playerCurrentHeight;
-			ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
-			ctx.fill();
-			// update hitZone
-			if (!otherPlayer.isRespawning) {
-				state.hitZone.push([otherPlayer.playerId, drawX, drawY, drawWidth, drawHeight]);
+				x1 = this.mainPlayer.x,
+				y1 = this.mainPlayer.y,
+				x2 = otherPlayer.x,
+				y2 = otherPlayer.y,
+				dx = x2 - x1,
+				dy = y2 - y1,
+				z = Math.pow(dx*dx + dy*dy, 0.5),
+				twoPI = Math.PI * 2;
+				rayAngleArray = this.rayAngleArray.slice(),
+				width = CONST.getWindowWidth(),
+				height = CONST.getWindowHeight(),
+				jumpHeight = otherPlayer.currentJumpHeight,
+				remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
+			let anotherPlayersAngleToMainPlayer;
+			// dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
+			if (dx === 0 && dy === 0) {
+				anotherPlayersAngleToMainPlayer = 0;
+			} else if (dx === 0) {
+				if (dy > 0) {
+					anotherPlayersAngleToMainPlayer = 0.25 * twoPI
+				} else if (dy < 0) {
+					anotherPlayersAngleToMainPlayer = 0.75 * twoPI
+				}
+			} else if (dy === 0) {
+				if (dx > 0) {
+					anotherPlayersAngleToMainPlayer = 0
+				} else if (dx < 0){
+					anotherPlayersAngleToMainPlayer = 0.5 * twoPI
+				}
+			} else if (dx > 0 && dy > 0) {
+				anotherPlayersAngleToMainPlayer = Math.atan(dy / dx);
+			} else if (dx < 0 && dy > 0) {
+				anotherPlayersAngleToMainPlayer = twoPI * 0.5 - Math.atan(dy / -dx);
+			} else if (dx < 0 && dy < 0) {
+				anotherPlayersAngleToMainPlayer = Math.atan(-dy / -dx) + twoPI * 0.5;
+			} else if (dx > 0 && dy < 0) {
+				anotherPlayersAngleToMainPlayer = twoPI - Math.atan(-dy / dx);
+			} 
+			anotherPlayersAngleToMainPlayer = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer);
+
+			function checkIfAnotherPlayerIsInSight(sightStartAngle, sightEndAngle, fov, anotherPlayersAngleToMainPlayer) {
+				const end = remapAngleToZeroToTwoPI(sightEndAngle);
+				let start = remapAngleToZeroToTwoPI(sightStartAngle); 
+				//console.log(start * 360 / Math.PI / 2, end * 360 / Math.PI / 2, anotherPlayersAngleToMainPlayer* 360 / Math.PI / 2)
+				if (end < fov) {
+					if ((start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < Math.PI * 2) || (0 < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end)) {
+						return true
+					} else {
+						return false
+					}
+				} else {
+					if (start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end) {
+						return true;
+					} else {
+						return false;
+					}
+				}
 			}
-		}
+		const isOtherPlayerInSight = checkIfAnotherPlayerIsInSight(rayAngleArray[0], rayAngleArray[rayAngleArray.length - 1], this.fov, anotherPlayersAngleToMainPlayer);
+
+		otherPlayer.isInSight = isOtherPlayerInSight;
+		otherPlayer.anotherPlayersAngleToMainPlayer = anotherPlayersAngleToMainPlayer;
+		otherPlayer.distance = z;
 	}
+	//
+	this.otherPlayers.map(obj => {
+		appendProperties(obj)
+	})
+}
+Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMainPlayer, z, screenWidth, screenHeight) {
+	const 
+		otherPlayerId = otherPlayer.playerId,
+		playerMaxWidth = 0.3 * CONST.getWindowWidth(),
+		playerMaxHeight = playerMaxWidth * 1.5,
+		//distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
+		distance = z,
+		playerCurrentWidth = Math.min((2 * playerMaxWidth / z), playerMaxWidth),
+		playerCurrentHeight = Math.min((2 * playerMaxHeight / z), playerMaxHeight);
 
-	const isOtherPlayerInSight = checkIfAnotherPlayerIsInSight(rayAngleArray[0], rayAngleArray[rayAngleArray.length - 1], this.fov, anotherPlayersAngleToMainPlayer);
+	const remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
+	const end = remapAngleToZeroToTwoPI(rayAngleArray[rayAngleArray.length - 1]);
+	let start = remapAngleToZeroToTwoPI(rayAngleArray[0]); 
 
-	if (isOtherPlayerInSight) {
-		drawOtherPlayer(otherPlayer, anotherPlayersAngleToMainPlayer);
+	if (anotherPlayersAngleToMainPlayer < start) {
+		// this function is called when another player is garanteed in sight
+		anotherPlayersAngleToMainPlayer += Math.PI * 2
+	}
+	otherPlayerPosOnScreen = Math.floor((anotherPlayersAngleToMainPlayer - start) / this.dAlpha);
+	const wallDistAtThisPos = this.wallDistArrayBeforeFishEyeCorrection[otherPlayerPosOnScreen];
+	if (z < wallDistAtThisPos) {
+		// check if another player is blocked by wall is HERE!!
+		// draw other player if insight
+		const ctx = document.getElementById('mainCanvas').getContext('2d');
+		const soilderEl = document.getElementById('soilder');
+		const 
+			drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
+			drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - jumpHeight,
+			drawWidth = playerCurrentWidth,
+			drawHeight = playerCurrentHeight;
+		//ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
+		//ctx.beginPath();
+		//ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
+		//ctx.fill();
+		ctx.globalAlpha = otherPlayer.isRespawning ? 0.5 : 1;
+		ctx.drawImage(soilderEl, 0, 0, soilderEl.width, soilderEl.height, drawX, drawY, drawWidth, drawHeight);
+		// player shadow
+		// const gradient = ctx.createLinearGradient(drawX, drawY, drawX + 200,drawY +200);
+		// gradient.addColorStop(0, 'rgba(0,0,0,0.2)');
+		// gradient.addColorStop(.5, 'rgba(0,0,0,1)');
+		// gradient.addColorStop(1, 'rgba(0,0,0,0.2)');
+		// ctx.fillStyle = gradient;
+		// ctx.beginPath();
+		// ctx.ellipse(drawX + 0.5 * drawWidth, drawY + drawHeight, 0.4 * drawWidth, 0.1 * drawWidth, 0, 0, 2 * Math.PI);
+		// ctx.fill();
+		ctx.globalAlpha = 1;
+		// other player's id
+		const fontSize = Math.min(16, 6 + 20/z);
+		ctx.font = '300 ' + fontSize + 'px Roboto';
+		ctx.fillStyle = "rgb(255, 0, 0)";
+		ctx.textAlign = "center";
+		ctx.fillText(otherPlayerId, drawX + 0.5 * drawWidth, drawY - 10); 
+		// update hitZone
+		if (!otherPlayer.isRespawning) {
+			state.hitZone.push([otherPlayerId, drawX, drawY, drawWidth, drawHeight]);
+		}
 	}
 }
 Game.prototype.drawMinimap = function() {
@@ -1348,6 +1457,48 @@ document.addEventListener('keyup', function(e) {
 					}
 })
 }
+Game.prototype.respawnFrame = function() {
+	const now = new Date();
+	const timeDiff = now - new Date(this.deathTimeStamp);
+	if (timeDiff > 5000) {
+		this.mainPlayer.respawn()
+	};
+
+	// animation
+	if (this.respawnFramethrottler) {
+		const ctx = document.getElementById('mainCanvas').getContext('2d');
+		const width = CONST.getWindowWidth();
+		const height = CONST.getWindowHeight();
+		if (timeDiff < 2500) {
+			ctx.fillStyle = 'rgba(0,0,0,0.1)';
+			ctx.fillRect(0, 0, width, height);
+			ctx.fill();
+			//
+			ctx.font = '500 36px Roboto';
+			ctx.fillStyle = "rgb(255, 255, 255)";
+			ctx.textAlign = "center";
+			ctx.fillText('RESPAWNING', 0.5 * width, 0.5 * height); 
+		} else {
+			ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+			ctx.fillRect(0, 0, width, height);
+			ctx.fill();
+			//
+			ctx.font = '500 36px Roboto';
+			ctx.fillStyle = "rgb(0, 0, 0)";
+			ctx.textAlign = "center";
+			ctx.fillText('HOLD ON', 0.5 * width, 0.5 * height); 
+		}
+		this.respawnFramethrottler *= -1;
+	}
+
+
+	//
+	if (state.isRespawning) {
+		requestAnimationFrame(this.respawnFrame);
+	} else {
+		requestAnimationFrame(this.frame);
+	}
+}
 Game.prototype.frame = function() {
 	this.mainPlayer.move();
 	if (state.isConnectedToServer) {
@@ -1362,11 +1513,8 @@ Game.prototype.frame = function() {
 		requestAnimationFrame(this.frame);
 	} else {
 		// state.isRespawning changed in serverconnection handledownlinkhitby
-		const doRespawan = () => {
-			this.mainPlayer.respawn();
-			requestAnimationFrame(this.frame);
-		}
-		setTimeout(doRespawan, 5000);
+		this.deathTimeStamp = new Date();
+		requestAnimationFrame(this.respawnFrame);
 	}
 }
 Game.prototype.play = function() {
@@ -1375,6 +1523,7 @@ Game.prototype.play = function() {
 	game.attachEventListeners();
 	serverConnection.initiateConnection();
 
+	this.respawnFrame = this.respawnFrame.bind(this);
 	this.frame = this.frame.bind(this);
 	requestAnimationFrame(this.frame);
 }
@@ -1507,8 +1656,9 @@ ServerConnection.prototype.handleDownLinkUpdateHitBy = function (received) {
 			this.upLinkDeath(hitBy);
 			state.updateServerMessage('You were killed by ' + hitBy);
 		}
-		const hpEl = document.getElementById('playerStatusHealthPoint');
-		hpEl.innerHTML = state.healthPoint;
+	state.damageIndicator.push(hitBy);
+	const hpEl = document.getElementById('playerStatusHealthPoint');
+	hpEl.innerHTML = state.healthPoint;
 	}
 }
 ServerConnection.prototype.handleDownLinkSomeoneLogout = function (received) {
