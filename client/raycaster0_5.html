@@ -521,7 +521,7 @@ function Player() {
 	this.isCT = (Math.random() > 0.5);
 	this.x /* init coordinate x */ ;
 	this.y /* init coordinate y */ ;
-	this.alpha /* init direction angle, relative to positive x axis */ = Math.random() > 0.5 ? (-0.75 * Math.PI * 2) /* up */: (0.25 * Math.PI * 2) /* down */;
+	this.alpha /* init direction angle, relative to positive x axis */ ;
 	this.forward = false;
 	this.backward = false;
 	this.clockwise = false;
@@ -543,9 +543,15 @@ Player.prototype.respawn = function() {
 	const respawnPos = Math.floor(Math.random() * 5);
 	this.x = this.isCT ? CTRespawn[respawnPos][0] : TRespawn[respawnPos][0];
 	this.y = this.isCT ? CTRespawn[respawnPos][1] : TRespawn[respawnPos][1];
+	this.alpha = Math.random() > 0.5 ? (-0.75 * Math.PI * 2) /* up */: (0.25 * Math.PI * 2) /* down */;
+	this.forward = false;
+	this.backward = false;
+	this.clockwise = false;
+	this.counterClockwise = false;
 
 	// respawned
 	if (state.isRespawning) state.isRespawning = false;
+	if (state.isConnectedToServer) serverConnection.upLinkRespawn();
 }
 Player.prototype.move = function() {
 	// update player coordinate
@@ -1342,8 +1348,9 @@ document.addEventListener('keyup', function(e) {
 Game.prototype.frame = function() {
 	this.mainPlayer.move();
 	if (state.isConnectedToServer) {
-		serverConnection.upLink();
+		serverConnection.upLinkUpdatePosition();
 		this.updateOtherPlayers();
+		if (state.hitPlayerArray.length !== 0) serverConnection.upLinkHit(); /* hitPlayerArray rest in uplinkhit() */
 	}
 	this.ray();
 	this.drawFrame();
@@ -1352,10 +1359,11 @@ Game.prototype.frame = function() {
 		requestAnimationFrame(this.frame);
 	} else {
 		if (!state.isRespawning) state.isRespawning = true;
-		setTimeout(() => {
+		const doRespawan = () => {
 			this.mainPlayer.respawn();
 			requestAnimationFrame(this.frame);
-		}, 5000)
+		}
+		setTimeout(doRespawan, 5000);
 	}
 }
 Game.prototype.play = function() {
@@ -1407,22 +1415,16 @@ ServerConnection.prototype.initiateConnection = function() {
 			state.latency = latency + ' ms';
 			//
 			setTimeout(() => this.ping(), 1000);
-		} else if (received.type === 'downLink') {
-			const playersArray = [];
-			const receivedArray = received.payload.slice();
-			receivedArray.map(obj => {
-				if (obj.playerId !== state.playerId) {
-					playersArray.push(obj)
-				} else if (obj.playerId === state.playerId){
-					// update this player's hp
-					if (state.healthPoint !== obj.healthPoint) {
-						state.healthPoint = obj.healthPoint;
-						const hpEl = document.getElementById('playerStatusHealthPoint');
-						hpEl.innerHTML = state.healthPoint;
-					}
-				}
-			})
-			state.playersArray = playersArray;
+		} else if (received.type === 'downLinkUpdatePosition') {
+			this.handleDownLinkUpdatePosition(received)
+		} else if (received.type === 'downLinkUpdateHitBy') {
+			this.handleDownLinkUpdateHitBy(received)
+		} else if (received.type === 'downLinkSomeoneLogout') {
+			this.handleDownLinkSomeoneLogout(received)
+		} else if (received.type === 'downLinkSomeoneRespawning') {
+			this.handleDownLinkSomeoneRespawning(received)
+		} else if (received.type === 'downLinkSomeoneRespawned') {
+			this.handleDownLinkSomeoneRespawned(received)
 		}
 	}
 
@@ -1436,22 +1438,101 @@ ServerConnection.prototype.ping = function() {
 	const now = new Date();
 	this.ws.send(JSON.stringify({type: 'ping', payload: now, playerId: state.playerId}));
 }
-ServerConnection.prototype.upLink = function() {
+ServerConnection.prototype.upLinkUpdatePosition = function() {
 	const player = game.mainPlayer;
 	const data = {
+		playerId: state.playerId,
 		x: player.x,
 		y: player.y,
-		healthPoint: state.healthPoint,
 		currentJumpHeight: state.accumulatedJumpHeight,
-		hit: state.hitPlayerArray.slice(),
-		isRespawning: state.isRespawning
 	};
-	this.ws.send(JSON.stringify({type: 'upLink', payload: data, playerId: state.playerId}));
-	if (state.hitPlayerArray.length !== 0) {
-		state.hitPlayerArray = []
+	this.ws.send(JSON.stringify({type: 'upLinkUpdatePosition', payload: data, playerId: state.playerId}));
+}
+ServerConnection.prototype.upLinkHit = function() {
+	const playerId = state.playerId;
+	const data = state.hitPlayerArray.slice();
+	this.ws.send(JSON.stringify({type: 'upLinkHit', payload: data, playerId: state.playerId}));
+	// reset hitPlayerArray after data sent
+	state.hitPlayerArray = [];
+}
+ServerConnection.prototype.upLinkDeath = function(hitBy) {
+	const playerId = state.playerId;
+	const data = hitBy;
+	this.ws.send(JSON.stringify({type: 'upLinkDeath', payload: data, playerId: state.playerId}));
+}
+ServerConnection.prototype.upLinkRespawn = function() {
+	this.ws.send(JSON.stringify({type: 'upLinkRespawn', payload: '', playerId: state.playerId}));
+}
+ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
+	let array = state.playersArray.slice();
+	const receivedObj = received.payload;
+	const idNeedUpdate = receivedObj.playerId;
+	if (array.length === 0) {
+		// new and first player joined
+		state.playersArray.push(receivedObj);
+		return
+	} 
+
+	array = array.filter(obj => obj.playerId === idNeedUpdate);
+	if (array.length === 0) {
+		// new player joined
+		state.playersArray.push(receivedObj)
+	} else {
+		array = state.playersArray.slice();
+		array.map(obj => {
+			if (obj.playerId === idNeedUpdate) {
+				obj.x = receivedObj.x,
+				obj.y = receivedObj.y,
+				obj.currentJumpHeight = receivedObj.currentJumpHeight
+			}
+		});
+		state.playersArray = array;
 	}
 }
-
+ServerConnection.prototype.handleDownLinkUpdateHitBy = function (received) {
+	if (!state.isRespawning) {
+		const 
+			hitBy = received.payload,
+			damage = Math.floor(Math.random() * 10 + 5),
+			hp = state.healthPoint,
+			hpAfterDamage = hp - damage;
+		if (hpAfterDamage > 0) {
+			state.healthPoint = hpAfterDamage;
+		} else {
+			state.healthPoint = 0;
+			state.isRespawning = true;
+			this.upLinkDeath(hitBy);
+			state.updateServerMessage('You were killed by ' + hitBy);
+		}
+		const hpEl = document.getElementById('playerStatusHealthPoint');
+		hpEl.innerHTML = state.healthPoint;
+	}
+}
+ServerConnection.prototype.handleDownLinkSomeoneLogout = function (received) {
+	const whoLogout = received.payload;
+	let array = state.playersArray.slice();
+	array = array.filter(obj => obj.playerId !== whoLogout);
+	state.playersArray = array;
+	const playerCount = array.length + 1;
+	const message = 'Player ' + whoLogout + ' has disconnected. There are ' + playerCount + ' players online.'
+	state.updateServerMessage(message);
+}
+ServerConnection.prototype.handleDownLinkSomeoneRespawning = function (received) {
+	const whoWasKilledId = received.payload;
+	state.playersArray.map(obj => {
+		if (obj.playerId === whoWasKilledId) {
+			obj.isRespawning = true
+		}
+	})
+}
+ServerConnection.prototype.handleDownLinkSomeoneRespawned = function (received) {
+	const whoRespawnedId = received.payload;
+	state.playersArray.map(obj => {
+		if (obj.playerId === whoRespawnedId) {
+			obj.isRespawning = false
+		}
+	})
+}
 function Loading() {
 	this.loaded = 0;
 	this.total = 1;
