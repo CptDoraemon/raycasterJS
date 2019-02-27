@@ -1280,8 +1280,9 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		playerMaxHeight = playerMaxWidth * 1.5,
 		//distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
 		distance = z,
-		playerCurrentWidth = Math.min((2 * playerMaxWidth / z), playerMaxWidth),
-		playerCurrentHeight = Math.min((2 * playerMaxHeight / z), playerMaxHeight);
+		playerCurrentWidth = Math.min((3 * playerMaxWidth / z) * 0.8, playerMaxWidth),
+		playerCurrentHeight = Math.min((3 * playerMaxHeight / z) * 0.8, playerMaxHeight),
+		playerCurrentJumpHeight = Math.min(6 * otherPlayer.currentJumpHeight / z, otherPlayer.currentJumpHeight);
 
 	const remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
 	const end = remapAngleToZeroToTwoPI(rayAngleArray[rayAngleArray.length - 1]);
@@ -1300,7 +1301,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		const soilderEl = document.getElementById('soilder');
 		const 
 			drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
-			drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - otherPlayer.currentJumpHeight,
+			drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - playerCurrentJumpHeight,
 			drawWidth = playerCurrentWidth,
 			drawHeight = playerCurrentHeight;
 		//ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
