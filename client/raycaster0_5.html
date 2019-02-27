@@ -1300,7 +1300,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		const soilderEl = document.getElementById('soilder');
 		const 
 			drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
-			drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - jumpHeight,
+			drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - otherPlayer.currentJumpHeight,
 			drawWidth = playerCurrentWidth,
 			drawHeight = playerCurrentHeight;
 		//ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
