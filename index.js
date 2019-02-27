@@ -88,7 +88,7 @@ function checkAndHandleIfTimeout(message, ws) {
 }
 function checkTimeout() {
 	if (!state.playersArray.length) {
-		state.isCheckPing = false;
+		state.isCheckTimeout = false;
 	} else {
 		const now = new Date();
 		const timeoutMax = 30 * 1000;
@@ -134,7 +134,7 @@ function newPlayerJoin(ws, wss) {
 	// send playerCount message
 	const playerCount = state.playersArray.length;
 	const message = playerCount === 1 ? 
-		'You are the only player online at this moment. (Wanna have some fun? Duplicate this tab can create another player)' : 
+		'You are the only player online at this moment. (Wanna have some fun? You can create an another player by duplicating this tab.)' : 
 		'There are ' + playerCount + ' players online';
 	ws.send(JSON.stringify({type: 'serverMessage', payload: message}));
 
@@ -148,8 +148,8 @@ function newPlayerJoin(ws, wss) {
 
 	// start check timeout
 	if (!state.isCheckTimeout) {
-		checkTimeout();
 		state.isCheckTimeout = true;
+		checkTimeout();
 	}
 }
 

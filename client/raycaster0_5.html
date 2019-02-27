@@ -551,7 +551,10 @@ Player.prototype.respawn = function() {
 
 	// respawned
 	if (state.isRespawning) state.isRespawning = false;
-	if (state.isConnectedToServer) serverConnection.upLinkRespawn();
+	if (state.isConnectedToServer) {
+		// 3s respawn immune damage
+		setTimeout(() => serverConnection.upLinkRespawn(), 3000)
+	}
 }
 Player.prototype.move = function() {
 	// update player coordinate
