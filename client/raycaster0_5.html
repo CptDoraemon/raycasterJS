@@ -228,6 +228,57 @@ body {
 	text-align: left;
 	font-size: 14px;
 }
+#scoreBoardComponent {
+	z-index: 10;
+	position: fixed;
+	visibility: hidden;
+	opacity: 0;
+	transition: 0.5s;
+	width: calc(60% - 40px);
+	height: calc(80% - 40px);
+	top: calc(10% - 20px);
+	left: 20%;
+	padding: 20px;
+	background-color: rgba(0, 0, 0, 0.8);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	font-family: 'Roboto', sans-serif;
+	font-weight: 300;
+	color: rgb(255, 255, 255);
+	text-align: center;
+	font-size: 14px;
+}
+.scoreBoardRowTitle {
+	font-weight: 700 !important;
+	border-bottom: 1px solid white;
+	margin-bottom: 10px;
+}
+.scoreBoardRowTitle:hover {
+	background-color: rgba(255, 255, 255, 0) !important;
+}
+.scoreBoardRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: flex-start;
+	width: 80%;
+	margin: 2px 0;
+	height: 21px;
+	line-height: 21px;
+	cursor: pointer;
+}
+.scoreBoardRow:hover {
+	background-color: rgba(255, 255, 255, 0.3);
+	cursor: pointer;
+}
+.scoreBoardRowHighlight {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+.scoreBoardRowItem {
+	width: 25%;
+}
 a{
 	text-decoration: none;
 	display: block;
@@ -425,7 +476,7 @@ function State() {
 	// _id for this player
 	this.playerId;
 	//
-	this.latency = 'pinging';
+	this.latency = 0;
 	this.isDisplayingLatency = true;
 	this.isLowerGraphicQuality = false;
 	//
@@ -666,7 +717,6 @@ Player.prototype.move = function() {
 					// [otherplayer.playerId, drawX. drawY, drawWidth, drawHeight]
 					const isHit = (i[1] < bulletHitX) && (bulletHitX < (i[1] + i[3])) && (i[2] < bulletHitY) && (bulletHitY < (i[2] + i[4]));
 					if (isHit) {
-						console.log('you hit player ' + i[0]);
 						state.hitPlayerArray.push(i[0]);
 						state.bulletHitConfirmed = true;
 					}
@@ -785,6 +835,9 @@ Game.prototype.initiateCanvas = function() {
 	const serverMessageComponent = new ServerMessageComponent();
 	serverMessageComponent.mountComponent();
 	state.updateServerMessage('Establishing connection to server');
+	// scoreboard
+	const scoreBoardComponent = new ScoreBoardComponent();
+	scoreBoardComponent.mountComponent();
 };
 Game.prototype.createMainPlayer = function() {
 	this.mainPlayer = new Player();
@@ -1198,6 +1251,9 @@ Game.prototype.drawFrame = function() {
 }
 Game.prototype.updateOtherPlayers = function() {
 	let array = state.playersArray.slice();
+	array = array.filter(obj => {
+		return obj.playerId !== state.playerId
+	});
 	this.otherPlayers = array;
 	// clear hit zone
 	state.hitZone = [];
@@ -1271,7 +1327,9 @@ Game.prototype.updateOtherPlayers = function() {
 	//
 	this.otherPlayers.map(obj => {
 		appendProperties(obj)
-	})
+	});
+	// sort, draw from far to close
+	this.otherPlayers.sort((a, b) => b.distance - a.distance);
 }
 Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMainPlayer, z, screenWidth, screenHeight) {
 	const 
@@ -1321,8 +1379,8 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		// ctx.fill();
 		ctx.globalAlpha = 1;
 		// other player's id
-		const fontSize = Math.min(16, 6 + 20/z);
-		ctx.font = '300 ' + fontSize + 'px Roboto';
+		const fontSize = Math.min(18, 8 + 20/z);
+		ctx.font = '500 ' + fontSize + 'px Roboto';
 		ctx.fillStyle = "rgb(255, 0, 0)";
 		ctx.textAlign = "center";
 		ctx.fillText(otherPlayerId, drawX + 0.5 * drawWidth, drawY - 10); 
@@ -1466,7 +1524,7 @@ Game.prototype.respawnFrame = function() {
 	};
 
 	// animation
-	if (this.respawnFramethrottler) {
+	if (this.respawnFramethrottler % 4 === 0) {
 		const ctx = document.getElementById('mainCanvas').getContext('2d');
 		const width = CONST.getWindowWidth();
 		const height = CONST.getWindowHeight();
@@ -1475,7 +1533,7 @@ Game.prototype.respawnFrame = function() {
 			ctx.fillRect(0, 0, width, height);
 			ctx.fill();
 			//
-			ctx.font = '500 36px Roboto';
+			ctx.font = '700 36px Roboto';
 			ctx.fillStyle = "rgb(255, 255, 255)";
 			ctx.textAlign = "center";
 			ctx.fillText('RESPAWNING', 0.5 * width, 0.5 * height); 
@@ -1484,19 +1542,20 @@ Game.prototype.respawnFrame = function() {
 			ctx.fillRect(0, 0, width, height);
 			ctx.fill();
 			//
-			ctx.font = '500 36px Roboto';
+			ctx.font = '700 36px Roboto';
 			ctx.fillStyle = "rgb(0, 0, 0)";
 			ctx.textAlign = "center";
 			ctx.fillText('HOLD ON', 0.5 * width, 0.5 * height); 
 		}
-		this.respawnFramethrottler *= -1;
 	}
+	this.respawnFramethrottler++
 
 
 	//
 	if (state.isRespawning) {
 		requestAnimationFrame(this.respawnFrame);
 	} else {
+		this.respawnFramethrottler = 1;
 		requestAnimationFrame(this.frame);
 	}
 }
@@ -1558,9 +1617,10 @@ ServerConnection.prototype.initiateConnection = function() {
 			state.updateServerMessage('Your ID is: ' + received.payload);
 			// start ping
 			this.ping();
-			// start upload data
+		} else if (received.type === 'downLinkInitiatePlayerObj') {
+			this.handleDownLinkInitiatePlayerObj(received);
+			// start update position to server
 			state.isConnectedToServer = true;
-
 		} else if (received.type === 'pingBack') {
 			const pingSent = new Date(received.payload);
 			const now = new Date();
@@ -1578,6 +1638,8 @@ ServerConnection.prototype.initiateConnection = function() {
 			this.handleDownLinkSomeoneRespawning(received)
 		} else if (received.type === 'downLinkSomeoneRespawned') {
 			this.handleDownLinkSomeoneRespawned(received)
+		} else if (received.type === 'downLinkUpdateKillNDeath') {
+			this.handleDownLinkUpdateKillNDeath(received)
 		}
 	}
 
@@ -1587,6 +1649,7 @@ ServerConnection.prototype.initiateConnection = function() {
 		state.isConnectedToServer = false;
 	}
 }
+
 ServerConnection.prototype.ping = function() {
 	const now = new Date();
 	this.ws.send(JSON.stringify({type: 'ping', payload: now, playerId: state.playerId}));
@@ -1598,6 +1661,7 @@ ServerConnection.prototype.upLinkUpdatePosition = function() {
 		x: player.x,
 		y: player.y,
 		currentJumpHeight: state.accumulatedJumpHeight,
+		latency: state.latency
 	};
 	this.ws.send(JSON.stringify({type: 'upLinkUpdatePosition', payload: data, playerId: state.playerId}));
 }
@@ -1611,10 +1675,24 @@ ServerConnection.prototype.upLinkHit = function() {
 ServerConnection.prototype.upLinkDeath = function(hitBy) {
 	const playerId = state.playerId;
 	const data = hitBy;
+	//
+	state.updateServerMessage('You were killed by ' + hitBy);
+	state.playersArray.map(obj => {
+		if (obj.playerId === state.playerId) {
+			obj.death ++;
+		} else if (obj.playerId === state.hitBy) {
+			obj.kill ++;
+		}
+	})
+	//
 	this.ws.send(JSON.stringify({type: 'upLinkDeath', payload: data, playerId: state.playerId}));
 }
 ServerConnection.prototype.upLinkRespawn = function() {
 	this.ws.send(JSON.stringify({type: 'upLinkRespawn', payload: '', playerId: state.playerId}));
+}
+ServerConnection.prototype.handleDownLinkInitiatePlayerObj = function(received) {
+	const array = received.payload;
+	state.playersArray = array;
 }
 ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
 	let array = state.playersArray.slice();
@@ -1636,7 +1714,10 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
 			if (obj.playerId === idNeedUpdate) {
 				obj.x = receivedObj.x,
 				obj.y = receivedObj.y,
-				obj.currentJumpHeight = receivedObj.currentJumpHeight
+				obj.currentJumpHeight = receivedObj.currentJumpHeight,
+				obj.latency = receivedObj.latency;
+				obj.kill = receivedObj.kill;
+				obj.death = receivedObj.death;
 			}
 		});
 		state.playersArray = array;
@@ -1655,7 +1736,6 @@ ServerConnection.prototype.handleDownLinkUpdateHitBy = function (received) {
 			state.healthPoint = 0;
 			state.isRespawning = true;
 			this.upLinkDeath(hitBy);
-			state.updateServerMessage('You were killed by ' + hitBy);
 		}
 	state.damageIndicator.push(hitBy);
 	const hpEl = document.getElementById('playerStatusHealthPoint');
@@ -1687,6 +1767,22 @@ ServerConnection.prototype.handleDownLinkSomeoneRespawned = function (received) 
 		}
 	})
 }
+ServerConnection.prototype.handleDownLinkUpdateKillNDeath = function (received) {
+	const 
+		payload = received.payload,
+		whoWasKilled = payload.whoWasKilled,
+		death = payload.death,
+		killedBy = payload.killedBy,
+		kill = payload.kill;
+	state.playersArray.map(obj => {
+		if (obj.playerId === whoWasKilled) {
+			obj.death = death
+		} else if (obj.playerId === killedBy) {
+			obj.kill = kill
+		}
+	})
+}
+
 function Loading() {
 	this.loaded = 0;
 	this.total = 1;
@@ -1829,9 +1925,10 @@ InstructionComponent.prototype.mountComponent = function() {
 					'<li>A: Turn Left</li>' +
 					'<li>D: Turn Right</li>' +
 					'<li>R: Reload</li>' +
+					'<li>M: Toggle Map Zooming</li>' +
 					'<li>Enter: Fire</li>' +
 					'<li>Space: Jump</li>' +
-					'<li>M: Toggle Map Zooming</li>' +
+					'<li>Tab: Score Board</li>' +
 				'</ul>' +
 			'<h1>Many thanks to these tutorials:</h1>' +
 				'<ul>' +
@@ -1842,10 +1939,10 @@ InstructionComponent.prototype.mountComponent = function() {
 			'<h2><a href="https://www.xiaoxihome.com" target="_blank"><span>&copy; XIAOXIHOME.COM 2017~2018</span></a><h2>';
 	rootDiv.appendChild(instructionComponent);
 	this.component = instructionComponent;
-	this.addEventListener();
+	this.attachEventListener();
 	this.toggleDisplay();
 }
-InstructionComponent.prototype.addEventListener = function() {
+InstructionComponent.prototype.attachEventListener = function() {
 	document.addEventListener('keydown', (e) => {
 		if (e.keyCode === 73) {
 			// button I
@@ -1971,7 +2068,7 @@ PlayerStatusComponent.prototype.mountComponent = function() {
 
 function ServerMessageComponent() {
 	this.component;
-	this.itemWrapperClass = 'serverMessageItemWrapper'
+	this.itemWrapperClass = 'serverMessageItemWrapper';
 }
 ServerMessageComponent.prototype.mountComponent = function() {
 	const rootDiv = document.getElementById('root');
@@ -1981,6 +2078,95 @@ ServerMessageComponent.prototype.mountComponent = function() {
 	this.component = serverMessageComponent;
 }
 
+function ScoreBoardComponent() {
+	this.component;
+	this.isDisplaying = false;
+	this.rowClassName = 'scoreBoardRow';
+	this.rowTitleClassName = 'scoreBoardRowTitle scoreBoardRow';
+	this.rowHighlightClassName = 'scoreBoardRow scoreBoardRowHighlight';
+	this.rowItemClassName = 'scoreBoardRowItem';
+
+	this.timeInterval;
+}
+ScoreBoardComponent.prototype.mountComponent = function() {
+	const rootDiv = document.getElementById('root');
+	const scoreBoardComponent = document.createElement('div');
+	scoreBoardComponent.id = 'scoreBoardComponent';
+	rootDiv.appendChild(scoreBoardComponent);
+	this.component = scoreBoardComponent;
+	this.attachEventListener();
+}
+ScoreBoardComponent.prototype.attachEventListener = function() {
+	document.addEventListener('keydown', (e) => {
+		if (e.keyCode === 9) {
+			// button Tab
+			e.preventDefault();
+			this.toggleDisplay();
+		}
+	});
+}
+ScoreBoardComponent.prototype.toggleDisplay = function() {
+	if (this.isDisplaying) {
+		this.isDisplaying = false;
+		clearInterval(this.timeInterval);
+		this.timeout = null;
+		this.component.style.opacity = 0;
+		this.component.style.visibility = 'hidden';
+	} else {
+		this.isDisplaying = true;
+		this.updateData();
+		this.timeInterval = setInterval(() => this.updateData(), 1000);
+		this.component.style.opacity = 1;
+		this.component.style.visibility = 'visible';
+	}
+}
+ScoreBoardComponent.prototype.updateData = function() {
+	if (this.isDisplaying) {
+		// sort state.playersArray
+		state.playersArray.sort((a, b) => b.kill - a.kill)
+
+		// components
+		const playerId = state.playerId;
+
+		const createRow = (isHightLighted) => {
+			const row = document.createElement('div');
+			row.className = isHightLighted ? this.rowHighlightClassName : this.rowClassName;
+			return row
+		}
+		const createRowItem = (itemContent) => {
+			const item = document.createElement('div');
+			item.className = this.rowItemClassName;
+			item.innerHTML = itemContent;
+			return item
+		}
+
+		this.component.innerHTML = '';
+		const title = document.createElement('div');
+		title.className = this.rowTitleClassName;
+		const id = createRowItem('Player ID');
+		const kill = createRowItem('Kill');
+		const death = createRowItem('Death');
+		const latency = createRowItem('Ping');
+		title.appendChild(id);
+		title.appendChild(kill);
+		title.appendChild(death);
+		title.appendChild(latency);
+		this.component.appendChild(title);
+
+		state.playersArray.map(obj => {
+			const row = obj.playerId === playerId ? createRow(true) : createRow(false);
+			const id = createRowItem(obj.playerId);
+			const kill = createRowItem(obj.kill);
+			const death = createRowItem(obj.death);
+			const latency = createRowItem(obj.latency);
+			row.appendChild(id);
+			row.appendChild(kill);
+			row.appendChild(death);
+			row.appendChild(latency);
+			this.component.appendChild(row);
+		})
+	}
+}
 
 
 window.onload = function() {

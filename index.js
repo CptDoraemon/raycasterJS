@@ -27,6 +27,9 @@ function State() {
 	// 	y: 0,
 	// 	currentJumpHeight: 0,
 	// 	lastPing: new Date(),
+	//	kill: 0,
+	//	death: 0,
+	//	latency: 0
 	// };
 	this.playersArray = [];
 	this.isCheckTimeout = false;
@@ -117,8 +120,9 @@ function checkTimeout() {
 }
 
 function newPlayerJoin(ws, wss) {
+
 	// create newPlayerObj, send playerId back to client
-	const playerId = (+new Date).toString(36).slice(-8);
+	const playerId = (+new Date()).toString(36).slice(-8);
 	ws.send(JSON.stringify({type: 'playerId', payload: playerId}));
 	const newPlayerObj = {
 		playerId: playerId,
@@ -127,9 +131,29 @@ function newPlayerJoin(ws, wss) {
 		healthPoint: 100,
 		currentJumpHeight: 0,
 		lastPing: new Date(),
-		ws: ws
+		ws: ws,
+		kill: 0,
+		death: 0,
+		latency: 0
 	};
 	state.playersArray.push(newPlayerObj);
+
+	// push state.playersArray to this new player
+	const processedObjArray = [];
+	state.playersArray.map(obj => {
+		const processedObj = {
+			playerId: obj.playerId,
+			x: obj.x,
+			y: obj.y,
+			healthPoint: obj.healthPoint,
+			currentJumpHeight: obj.currentJumpHeight,
+			kill: obj.kill,
+			death: obj.death,
+			latency: obj.latency
+		}
+		processedObjArray.push(processedObj)
+	});
+	ws.send(JSON.stringify({type: 'downLinkInitiatePlayerObj', payload: processedObjArray}));
 
 	// send playerCount message
 	const playerCount = state.playersArray.length;
@@ -175,6 +199,9 @@ function handleUpLinkUpdatePosition(ws, message, wss) {
 			playerObj.x = received.x;
 			playerObj.y = received.y;
 			playerObj.currentJumpHeight = received.currentJumpHeight;
+			playerObj.latency = received.latency;
+			received.kill = playerObj.kill;
+			received.death = playerObj.death;
 		}
 	});
 
@@ -200,18 +227,35 @@ function handleUpLinkHit(ws, message, wss) {
 function handleUpLinkDeath(ws, message, wss) {
 	const whoWasKilled = message.playerId;
 	const killedBy = message.payload;
+	let kill, death;
 
 	state.playersArray.map(obj => {
-		if (obj.playerId === whoWasKilled) {
-			obj.isRespawning = true;
-		} else if (obj.playerId === killedBy) {
-			obj.ws.send(JSON.stringify({type: 'serverMessage', payload: 'You killed ' + whoWasKilled}));
-			obj.ws.send(JSON.stringify({type: 'downLinkSomeoneRespawning', payload: whoWasKilled}));
-		} else {
-			obj.ws.send(JSON.stringify({type: 'serverMessage', payload: killedBy + ' killed ' + whoWasKilled}));
-			obj.ws.send(JSON.stringify({type: 'downLinkSomeoneRespawning', payload: whoWasKilled}));
+		try {
+			if (obj.playerId === whoWasKilled) {
+				obj.isRespawning = true;
+				death = ++obj.death;
+			} else if (obj.playerId === killedBy) {
+				kill = ++obj.kill;
+				obj.ws.send(JSON.stringify({type: 'serverMessage', payload: 'You killed ' + whoWasKilled}));
+				obj.ws.send(JSON.stringify({type: 'downLinkSomeoneRespawning', payload: whoWasKilled}));
+			} else {
+				obj.ws.send(JSON.stringify({type: 'serverMessage', payload: killedBy + ' killed ' + whoWasKilled}));
+				obj.ws.send(JSON.stringify({type: 'downLinkSomeoneRespawning', payload: whoWasKilled}));
+			}
+		} catch (e){
+			console.log(e)
 		}
 	})
+	console.log(kill);
+	const downLinkData = {
+		whoWasKilled: whoWasKilled,
+		death: death,
+		killedBy: killedBy,
+		kill: kill
+	};
+	wss.clients.forEach(client => {
+		client.send(JSON.stringify({type: 'downLinkUpdateKillNDeath', payload: downLinkData}));
+	});
 }
 
 function handleUpLinkRespawn(ws, message, wss) {
