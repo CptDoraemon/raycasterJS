@@ -746,11 +746,12 @@ Player.prototype.move = function() {
 			// bullet sparks: create new sparks; move existed is above
 			const now = new Date();
 			const baseWidth = CONST.getWindowWidth() * 0.01;
+			const baseWidthToZ = Math.min(baseWidth, baseWidth * 2 / state.bulletHitZ);
 			const radius = Math.min(5, 20 / state.bulletHitZ);
 			if (!state.bulletHitConfirmed) {
 				for (let i=0; i<5; i++) {
-					let sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.1;
-					let sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.1;
+					let sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.1;
+					let sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.05;
 					const dirt = {
 						type: 'dirt',
 						speedX: sparkSpeedX,
@@ -761,8 +762,8 @@ Player.prototype.move = function() {
 						radius: radius * 0.5,
 						alpha: 0.8
 					};
-					sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.2;
-					sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.2;
+					sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.5;
+					sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.5;
 					const spark = {
 						type: 'spark',
 						speedX: sparkSpeedX,
@@ -777,8 +778,8 @@ Player.prototype.move = function() {
 				}
 			} else {
 				for (let i=0; i<10; i++) {
-					const sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.2;
-					const sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.2;
+					const sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.5;
+					const sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.5;
 					const blood = {
 						type: 'blood',
 						speedX: sparkSpeedX,
@@ -1177,21 +1178,22 @@ Game.prototype.drawFrame = function() {
 	function moveBulletSparks() {
 		const now = new Date();
 		const newArray = [];
-		const gravity = CONST.getWindowWidth() * 0.0001;
+		const gravity = CONST.getWindowWidth() * 0.000005;
+		const gravityToZ = Math.min(gravity, gravity * 2 / state.bulletHitZ);
 		state.bulletHitSparks.map((obj) => {
 			if (now - obj.timeStamp < 500) {
 				if (obj.type === 'dirt') {
 					obj.x += obj.speedX;
 					obj.speedX *= 0.9;
-					obj.speedY += 0.05 * gravity;
+					obj.speedY += gravityToZ;
 					obj.y += obj.speedY;
 					obj.alpha -= 0.003;
 				} else {
-					// sparks
+					// sparks and blood
 					obj.x += obj.speedX;
 					obj.speedX *= 0.999;
-					obj.speedY -= 0.05 * gravity;
-					obj.y -= obj.speedY;
+					obj.speedY += gravityToZ;
+					obj.y += obj.speedY;
 					obj.alpha -= 0.001;
 				}
 				obj.radius *= 0.99;
@@ -1201,7 +1203,7 @@ Game.prototype.drawFrame = function() {
 		state.bulletHitSparks = newArray;
 
 		state.bulletHitSparks.map((obj) => {
-			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.alpha+')' : obj.type === 'dirt' ? 'rgba(0,0,0,'+obj.alpha+')' : 'rgba(255,0,0,'+obj.alpha+')';
+			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.alpha+')' : obj.type === 'dirt' ? 'rgba(50,50,50,'+obj.alpha+')' : 'rgba(255,0,0,'+obj.alpha+')';
 			ctx.beginPath();
 			ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
 			ctx.fill();
@@ -1241,7 +1243,7 @@ Game.prototype.drawFrame = function() {
 		ctx.rotate(-state.muzzelRotate);
 		ctx.translate(-muzzleCenterX, -muzzleCenterY);
 		// draw crater
-		const radius = Math.min(5, 20 / state.bulletHitZ);
+		const radius = Math.min(4, 20 / state.bulletHitZ);
 		ctx.fillStyle = state.bulletHitConfirmed ? 'rgb(255,0,0)' : 'rgb(0,0,0)';
 		ctx.beginPath();
 		ctx.arc(state.bulletHitX, state.bulletHitY, radius, 0, 2 * Math.PI);
