@@ -519,7 +519,10 @@ State.prototype.updateServerMessage = function(newMessage) {
 	array.map(msg => {
 		innerComponent += '<div class="serverMessageItemWrapper">' + msg + '</div>';
 	});
-
+	// innerHtml = '' doesn't remove node, lastChild is faster than firstChild
+	while(serverMessageComponent.lastChild) {
+		serverMessageComponent.removeChild(serverMessageComponent.lastChild);
+	};
 	serverMessageComponent.innerHTML = innerComponent;
 	this.serverMessage = array;
 
@@ -576,6 +579,15 @@ State.prototype.getGunPostion = function() {
 		gunWidth = 0.4*width,
 		gunHeight = 0.4*height;
 	return [gunPosStartX, gunPosStartY, gunWidth, gunHeight]
+}
+State.prototype.updateText = function(elId, updatedText) {
+	let 
+		el = document.getElementById(elId),
+		textNode = document.createTextNode(updatedText);
+	for (let c = el.firstChild; c !== null; c = el.firstChild) {
+		el.removeChild(c)
+	};
+	el.appendChild(textNode);
 }
 // init objects
 const 
@@ -662,11 +674,11 @@ Player.prototype.move = function() {
 	}
 
 	// firing
-	const 
-		currentMagzineText  = document.getElementById('plaerStatusCurrentMagzine'),
-		totalMagzineText  = document.getElementById('plaerStatusTotalMagzine');
-
 	const reload = () => {
+		const 
+			currentMagzineTextEl  = document.getElementById('playerStatusCurrentMagzine'),
+			totalMagzineTextEl  = document.getElementById('playerStatusTotalMagzine');
+
 		if (state.currentMagzine === param.currentMagzineMax) {
 			// full mag, no need to reload
 			state.isReloadRequested = false;
@@ -691,12 +703,12 @@ Player.prototype.move = function() {
 					// mag empty
 					const red = 'rgba(255, 69, 0, 1)';
 					state.isMagzineEmpty = true;
-					currentMagzineText.style.color = red;
-					totalMagzineText.style.color = red;
+					currentMagzineTextEl.style.color = red;
+					totalMagzineTextEl.style.color = red;
 				}
 				// update text
-				currentMagzineText.innerHTML = state.currentMagzine;
-				totalMagzineText.innerHTML = state.totalMagzine;
+				state.updateText('playerStatusCurrentMagzine', state.currentMagzine);
+				state.updateText('playerStatusTotalMagzine', state.totalMagzine);
 				state.isReloading = false;
 				state.isReloadRequested = false;
 			}, 1000)
@@ -729,10 +741,10 @@ Player.prototype.move = function() {
 				});
 			}
 			// update text
-			currentMagzineText.innerHTML = state.currentMagzine;
+			state.updateText('playerStatusCurrentMagzine', state.currentMagzine);
 			setTimeout(() => {
 				state.thisRoundFiringFinished = true;
-			}, 100)
+			}, 100);
 			// recoil
 			state.updateGunPostion(true);
 			// eject bullet shell
@@ -787,9 +799,10 @@ Player.prototype.move = function() {
 			i[1] += i[3];	/* update Y */
 			i[3] += emptyBulletGravity; /* update speedY */
 		});
-		state.emptyBullets.filter(i => {
+		state.emptyBullets = state.emptyBullets.filter(i => {
 			// filter bullets out of border
-			i[0] > width || i[0] < 0 || i[1] > height || i[1] < 0
+			const outOfBorder = i[0] > width || i[0] < 0 || i[1] > height || i[1] < 0;
+			return !outOfBorder
 		})
 	}
 };
@@ -1795,7 +1808,12 @@ Loading.prototype.drawLoadingPage = function() {
 		// update text
 		if (displayingPercentage + 1 <= loadingPercentage) {
 			displayingPercentage++;
-			loadingPercentageSpan.innerHTML = displayingPercentage;
+			const el = loadingPercentageSpan;
+			while (loadingPercentageSpan.lastChild) {
+				loadingPercentageSpan.removeChild(loadingPercentageSpan.lastChild)
+			}
+			const newText = document.createTextNode(displayingPercentage);
+			loadingPercentageSpan.appendChild(newText);
 		}
 
 		// change text color to white once loaded > 50%
@@ -1969,7 +1987,7 @@ ToolBarComponent.prototype.openSettingDropdown = function() {
 }
 
 function PlayerStatusComponent() {
-	this.component;
+
 }
 PlayerStatusComponent.prototype.mountComponent = function() {
 	const rootDiv = document.getElementById('root');
@@ -1989,11 +2007,10 @@ PlayerStatusComponent.prototype.mountComponent = function() {
 					'<i class="fas fa-joint"></i>' +
 				'</div>' +
 				'<div class="playerStatusValue">' +
-					'<span id="plaerStatusCurrentMagzine">' + state.currentMagzine + '</span>' + '|' + '<span id="plaerStatusTotalMagzine">' + state.totalMagzine + '</span>' +
+					'<span id="playerStatusCurrentMagzine">' + state.currentMagzine + '</span>' + '|' + '<span id="playerStatusTotalMagzine">' + state.totalMagzine + '</span>' +
 				'</div>' +
 			'</div>';
 	rootDiv.appendChild(playerStatusComponent);
-	this.component = playerStatusComponent;
 }
 
 function ServerMessageComponent() {
@@ -2039,13 +2056,17 @@ ScoreBoardComponent.prototype.toggleDisplay = function() {
 	if (this.isDisplaying) {
 		this.isDisplaying = false;
 		clearInterval(this.timeInterval);
-		this.timeout = null;
+		this.timeInterval = null;
 		this.component.style.opacity = 0;
 		this.component.style.visibility = 'hidden';
+		while(this.component.lastChild) {
+			this.component.removeChild(this.component.lastChild);
+		};
 	} else {
 		this.isDisplaying = true;
 		this.updateData();
-		this.timeInterval = setInterval(() => this.updateData(), 1000);
+		this.updateData = this.updateData.bind(this);
+		this.timeInterval = setInterval(this.updateData, 1000);
 		this.component.style.opacity = 1;
 		this.component.style.visibility = 'visible';
 	}
@@ -2071,7 +2092,10 @@ ScoreBoardComponent.prototype.updateData = function() {
 			return item
 		}
 
-		this.component.innerHTML = '';
+		// innerHtml = '' doesn't remove node, lastChild is faster than firstChild
+		while(this.component.lastChild) {
+			this.component.removeChild(this.component.lastChild);
+		};
 		const title = document.createElement('div');
 		title.className = this.rowTitleClassName;
 		const id = createRowItem('Player ID');
