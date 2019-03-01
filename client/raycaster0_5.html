@@ -460,6 +460,7 @@ function State() {
 	this.bulletHitX;
 	this.bulletHitY;
 	this.bulletHitConfirmed; /* used to change crater color */
+	this.bulletHitSparks = [];
 	//
 	this.canvasCenterTextOpacity = 1;
 	this.canvasCenterTextOpacitySign = -1;
@@ -672,7 +673,31 @@ Player.prototype.move = function() {
 		state.currentJumpVelocity = 0;
 		state.accumulatedJumpHeight = 0;
 	}
-
+	// bullet sparks: move all sparks already existed; create new is at firing part
+	const now = new Date();
+	if (state.bulletHitSparks.length !== 0) {
+		const newArray = [];
+		const gravity = CONST.getWindowWidth() * 0.002;
+		state.bulletHitSparks.map((obj) => {
+			if (now - obj.timeStamp < 500) {
+				if (obj.type === 'dirt') {
+					obj.x += obj.speedX;
+					obj.speedX *= 0.9;
+					obj.y += 2 * gravity;
+				} else {
+					// sparks
+					obj.x += obj.speedX;
+					obj.speedX *= 0.9;
+					obj.speedY -= gravity;
+					obj.y -= obj.speedY;
+				}
+				obj.radius *= 0.99;
+				obj.alpha -= 0.02;
+				newArray.push(obj);
+			}
+		})
+		state.bulletHitSparks = newArray;
+	};
 	// firing
 	const reload = () => {
 		const 
@@ -739,6 +764,52 @@ Player.prototype.move = function() {
 						state.bulletHitConfirmed = true;
 					}
 				});
+			}
+			// bullet sparks: create new sparks; move existed is above
+			const now = new Date();
+			const baseWidth = CONST.getWindowWidth() * 0.1;
+			if (!state.bulletHitConfirmed) {
+				for (let i=0; i<3; i++) {
+					let sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.01;
+					const dirt = {
+						type: 'dirt',
+						speedX: sparkSpeedX,
+						timeStamp: now,
+						x: state.bulletHitX,
+						y: state.bulletHitY,
+						radius: 1,
+						alpha: 1
+					};
+					sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.5;
+					const sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.5;
+					const spark = {
+						type: 'spark',
+						speedX: sparkSpeedX,
+						speedY: sparkSpeedY,
+						timeStamp: now,
+						x: state.bulletHitX,
+						y: state.bulletHitY,
+						radius: 2,
+						alpha: 1
+					};
+					state.bulletHitSparks.push(dirt, spark);
+				}
+			} else {
+				for (let i=0; i<10; i++) {
+					const sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.5;
+					const sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.5;
+					const blood = {
+						type: 'blood',
+						speedX: sparkSpeedX,
+						speedY: sparkSpeedY,
+						timeStamp: now,
+						x: state.bulletHitX,
+						y: state.bulletHitY,
+						radius: 2,
+						alpha: 1
+					};
+					state.bulletHitSparks.push(blood);	
+				}			
 			}
 			// update text
 			state.updateText('playerStatusCurrentMagzine', state.currentMagzine);
@@ -1102,7 +1173,7 @@ Game.prototype.drawFrame = function() {
 	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || state.currentJumpVelocity;
 	const crosshairSize = isMoving ? 15 : 0;
 
-	ctx.strokeStyle = "rgba(0,255,0,1)";
+	ctx.strokeStyle = "rgba(0,255,0,0.8)";
 	ctx.beginPath();
 	ctx.moveTo(0.5*width-20-crosshairSize,0.5*height);
 	ctx.lineTo(0.5*width-5-crosshairSize,0.5*height);
@@ -1120,6 +1191,15 @@ Game.prototype.drawFrame = function() {
 	ctx.lineTo(0.5*width,0.5*height+20+crosshairSize);
 	ctx.stroke();
 
+	// bullet sparks: before gun due to layer priority
+	if (state.bulletHitSparks.length !== 0) {
+		state.bulletHitSparks.map((obj) => {
+			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.alpha+')' : obj.type === 'dirt' ? 'rgba(0,0,0,'+obj.alpha+')' : 'rgba(255,0,0,'+obj.alpha+')';
+			ctx.beginPath();
+			ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
+			ctx.fill();
+		})
+	}
 	// gun
 	const
 		gunPosition = state.getGunPostion(),
@@ -1884,7 +1964,7 @@ InstructionComponent.prototype.mountComponent = function() {
 					'<li><a href="http://permadi.com/1996/05/ray-casting-tutorial-table-of-contents/" target="_blank">Permadi.com</a></li>' +
 					'<li><a href="http://lodev.org/cgtutor/raycasting.html" target="_blank">Lodev.org</a></li>' +
 				'</ul>' +
-			'<h2><a href="https://www.xiaoxihome.com" target="_blank"><span>&copy; XIAOXIHOME.COM 2017~2018</span></a><h2>';
+			'<h2><a href="https://www.xiaoxihome.com" target="_blank"><span>&copy; XIAOXIHOME.COM 2018~2019</span></a><h2>';
 	rootDiv.appendChild(instructionComponent);
 	this.component = instructionComponent;
 	this.attachEventListener();
