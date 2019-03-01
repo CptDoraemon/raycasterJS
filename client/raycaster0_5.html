@@ -489,6 +489,7 @@ function State() {
 	this.hitPlayerArray /* the id of the other players being hit by this player in a frame */ = [];
 	//
 	this.isRespawning = false;
+	this.isRepawnProtected = false;
 	//
 	this.damageIndicator = [];
 	//
@@ -617,6 +618,8 @@ Player.prototype.respawn = function() {
 
 	// respawned
 	if (state.isRespawning) state.isRespawning = false;
+	state.isRepawnProtected = true;
+	setTimeout(() => state.isRepawnProtected = false, 3000);
 }
 Player.prototype.move = function() {
 	// update player coordinate
@@ -1523,7 +1526,7 @@ Game.prototype.respawnFrame = function() {
 	const now = new Date();
 	const timeDiff = now - new Date(this.deathTimeStamp);
 	if (timeDiff > 5000) {
-		this.mainPlayer.respawn()
+		this.mainPlayer.respawn();
 	};
 	// 
 	if (state.isConnectedToServer) {
@@ -1644,7 +1647,7 @@ ServerConnection.prototype.upLinkUpdatePosition = function() {
 		death: state.death,
 		latency: state.latency,
 		timeSent: new Date(),
-		isRespawning: state.isRespawning,
+		isRespawning: (state.isRepawnProtected || state.isRespawning) ? true : false,
 		hitPlayerArray: state.hitPlayerArray
 	};
 	if (state.killedBy) {
@@ -1685,8 +1688,14 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
 					state.updateServerMessage('You were killed by ' + mainPlayerObj.hitBy[i]);
 					const hpEl = document.getElementById('playerStatusHealthPoint');
 					hpEl.innerHTML = state.healthPoint;
+					//
+					setTimeout(() => {
+						state.damageIndicator = [];
+						game.drawDamageIndicatorArray = [];
+					}, 1000);
 					break;
 				} else {
+					state.damageIndicator.push(mainPlayerObj.hitBy[i]);
 					state.healthPoint = hpAfterDamage;
 					const hpEl = document.getElementById('playerStatusHealthPoint');
 					hpEl.innerHTML = state.healthPoint;
