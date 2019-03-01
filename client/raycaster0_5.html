@@ -1341,7 +1341,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 	const 
 		otherPlayerId = otherPlayer.playerId,
 		playerMaxWidth = 0.3 * CONST.getWindowWidth(),
-		playerMaxHeight = playerMaxWidth * 1.5,
+		playerMaxHeight = playerMaxWidth * (24 / 13.6), /* ratio as per actual image ratio */
 		//distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
 		distance = z,
 		playerCurrentWidth = Math.min((3 * playerMaxWidth / z) * 0.8, playerMaxWidth),
@@ -1367,7 +1367,8 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 			drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
 			drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - playerCurrentJumpHeight,
 			drawWidth = playerCurrentWidth,
-			drawHeight = playerCurrentHeight;
+			drawHeight = playerCurrentHeight,
+			hitZoneWidth = (10 / 13.6) * drawWidth; /* ratio as per actual image ratio */
 		//ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
 		//ctx.beginPath();
 		//ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
@@ -1392,7 +1393,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		ctx.fillText(otherPlayerId, drawX + 0.5 * drawWidth, drawY - 10); 
 		// update hitZone
 		if (!otherPlayer.isRespawning) {
-			state.hitZone.push([otherPlayerId, drawX, drawY, drawWidth, drawHeight]);
+			state.hitZone.push([otherPlayerId, drawX, drawY, hitZoneWidth, drawHeight]);
 		}
 	}
 }
