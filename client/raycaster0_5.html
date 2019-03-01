@@ -459,6 +459,7 @@ function State() {
 	this.thisRoundFiringFinished = true;
 	this.bulletHitX;
 	this.bulletHitY;
+	this.bulletHitZ;
 	this.bulletHitConfirmed; /* used to change crater color */
 	this.bulletHitSparks = [];
 	//
@@ -728,6 +729,7 @@ Player.prototype.move = function() {
 			const bulletHitY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * recoil;
 			state.bulletHitX = bulletHitX;
 			state.bulletHitY = bulletHitY;
+			state.bulletHitZ = game.wallDistArrayBeforeFishEyeCorrection[Math.floor(bulletHitX)];
 			state.bulletHitConfirmed = false;
 			// check hit
 			if (state.hitZone.length) {
@@ -737,26 +739,30 @@ Player.prototype.move = function() {
 					if (isHit) {
 						state.hitPlayerArray.push(i[0]);
 						state.bulletHitConfirmed = true;
+						state.bulletHitZ = i[5];
 					}
 				});
 			}
 			// bullet sparks: create new sparks; move existed is above
 			const now = new Date();
 			const baseWidth = CONST.getWindowWidth() * 0.01;
+			const radius = Math.min(5, 20 / state.bulletHitZ);
 			if (!state.bulletHitConfirmed) {
 				for (let i=0; i<5; i++) {
 					let sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.1;
+					let sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.1;
 					const dirt = {
 						type: 'dirt',
 						speedX: sparkSpeedX,
+						speedY: sparkSpeedY,
 						timeStamp: now,
 						x: state.bulletHitX,
 						y: state.bulletHitY,
-						radius: 1,
+						radius: radius * 0.5,
 						alpha: 0.8
 					};
 					sparkSpeedX = (Math.random() - 0.5) * baseWidth * 0.2;
-					const sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.2;
+					sparkSpeedY = (Math.random() - 0.5) * baseWidth * 0.2;
 					const spark = {
 						type: 'spark',
 						speedX: sparkSpeedX,
@@ -764,7 +770,7 @@ Player.prototype.move = function() {
 						timeStamp: now,
 						x: state.bulletHitX,
 						y: state.bulletHitY,
-						radius: 2,
+						radius: radius,
 						alpha: 1
 					};
 					state.bulletHitSparks.push(dirt, spark);
@@ -780,7 +786,7 @@ Player.prototype.move = function() {
 						timeStamp: now,
 						x: state.bulletHitX,
 						y: state.bulletHitY,
-						radius: 2,
+						radius: radius,
 						alpha: 1
 					};
 					state.bulletHitSparks.push(blood);	
@@ -1177,7 +1183,8 @@ Game.prototype.drawFrame = function() {
 				if (obj.type === 'dirt') {
 					obj.x += obj.speedX;
 					obj.speedX *= 0.9;
-					obj.y += 2 * gravity;
+					obj.speedY += 0.05 * gravity;
+					obj.y += obj.speedY;
 					obj.alpha -= 0.003;
 				} else {
 					// sparks
@@ -1234,9 +1241,10 @@ Game.prototype.drawFrame = function() {
 		ctx.rotate(-state.muzzelRotate);
 		ctx.translate(-muzzleCenterX, -muzzleCenterY);
 		// draw crater
+		const radius = Math.min(5, 20 / state.bulletHitZ);
 		ctx.fillStyle = state.bulletHitConfirmed ? 'rgb(255,0,0)' : 'rgb(0,0,0)';
 		ctx.beginPath();
-		ctx.arc(state.bulletHitX, state.bulletHitY, 2, 0, 2 * Math.PI);
+		ctx.arc(state.bulletHitX, state.bulletHitY, radius, 0, 2 * Math.PI);
 		ctx.fill();
 	}
 	ctx.drawImage(gun, 0, 0, gunWidthSource, gunHeightSource, gunPosStartX, gunPosStartY, gunWidth, gunHeight);
@@ -1492,7 +1500,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		ctx.fillText(otherPlayerId, drawX + 0.5 * drawWidth, drawY - 10); 
 		// update hitZone
 		if (!otherPlayer.isRespawning) {
-			state.hitZone.push([otherPlayerId, drawX, drawY, hitZoneWidth, drawHeight]);
+			state.hitZone.push([otherPlayerId, drawX, drawY, hitZoneWidth, drawHeight, z]);
 		}
 	}
 }
