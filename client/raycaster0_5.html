@@ -1675,7 +1675,7 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
 	const latency = Math.floor((now - new Date(mainPlayerObj.timeSent)) / 2);
 	state.latency = latency;
 	// calc damage
-	if (mainPlayerObj.hitBy) {
+	if (mainPlayerObj.hitBy && !state.isRespawning && !state.isRepawnProtected) {
 		if (mainPlayerObj.hitBy.length !== 0) {
 			for (let i=0; i<mainPlayerObj.hitBy.length; i++) {
 				const damage = Math.floor(Math.random() * 10 + 5);

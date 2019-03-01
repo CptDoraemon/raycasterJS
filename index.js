@@ -132,7 +132,7 @@ function handleUpLinkUpdatePosition(message, ws, wss) {
 		}
 	});
 
-	state.playersArray = playersArray.slice();
+	state.playersArray = playersArray;
 	//
 	if (!state.isCheckTimeout) {
 		state.isCheckTimeout = true;
