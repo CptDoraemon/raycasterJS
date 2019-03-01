@@ -473,6 +473,7 @@ function State() {
 	this.emptyBullets = [];
 	// server message
 	this.serverMessage = [];
+	this.serverMessageTimeout = null;
 	// _id for this player
 	this.playerId;
 	//
@@ -490,8 +491,13 @@ function State() {
 	this.isRespawning = false;
 	//
 	this.damageIndicator = [];
+	//
+	this.kill = 0;
+	this.death = 0;
 }
 State.prototype.updateServerMessage = function(newMessage) {
+	if (this.serverMessageTimeout) clearTimeout(this.serverMessageTimeout);
+	//
 	const 
 		array = this.serverMessage.slice(),
 		serverMessageComponent = document.getElementById('serverMessageComponent');
@@ -516,8 +522,9 @@ State.prototype.updateServerMessage = function(newMessage) {
 	serverMessageComponent.innerHTML = innerComponent;
 	this.serverMessage = array;
 
-	setTimeout(() => {
+	this.serverMessageTimeout = setTimeout(() => {
 		serverMessageComponent.style.opacity = 0;
+		this.serverMessageTimeout = null;
 	}, 15000) 
 }
 State.prototype.updateGunPostion = function(isFiring=false) {
@@ -610,10 +617,6 @@ Player.prototype.respawn = function() {
 
 	// respawned
 	if (state.isRespawning) state.isRespawning = false;
-	if (state.isConnectedToServer) {
-		// 3s respawn immune damage
-		setTimeout(() => serverConnection.upLinkRespawn(), 3000)
-	}
 }
 Player.prototype.move = function() {
 	// update player coordinate
@@ -642,13 +645,13 @@ Player.prototype.move = function() {
 	let currentJumpVelocity = state.currentJumpVelocity;
 	const 
 		gravity = this.gravity,
-		jumpHiehtInThisFrame /* vt, t=1 here */ = currentJumpVelocity,
-		accumulatedJumpHeightAfterThisJump = state.accumulatedJumpHeight + jumpHiehtInThisFrame;
+		jumpHeihtInThisFrame /* vt, t=1 here */ = currentJumpVelocity,
+		accumulatedJumpHeightAfterThisJump = state.accumulatedJumpHeight + jumpHeihtInThisFrame;
 	
 	if (accumulatedJumpHeightAfterThisJump > 0) {
 		// still jumping
 		state.currentJumpVelocity = currentJumpVelocity - gravity;
-		state.accumulatedJumpHeight += jumpHiehtInThisFrame;
+		state.accumulatedJumpHeight += jumpHeihtInThisFrame;
 	} else {
 		// returned ground
 		state.currentJumpVelocity = 0;
@@ -1070,14 +1073,14 @@ Game.prototype.drawFrame = function() {
 		ctx.beginPath();
 		ctx.fillRect(index * resolution, wallStart + state.accumulatedJumpHeight, resolution, wallEnd - wallStart);
 		ctx.fill();
-	})
+	});
 
 	// otherplayer
 	this.otherPlayers.map(otherplayer => {
-			if (otherplayer.isInSight) {
-				this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance, width, height)
-			}
-		});
+		if (otherplayer.isInSight) {
+			this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance, width, height)
+		}
+	});
 
 	// crosshair
 	const isMoving = this.mainPlayer.forward || this.mainPlayer.backward || state.currentJumpVelocity;
@@ -1174,7 +1177,7 @@ Game.prototype.drawFrame = function() {
 		ctx.font = "300 10px Roboto";
 		ctx.fillStyle = "rgb(0, 0, 0)";
 		ctx.textAlign = "right";
-		ctx.fillText('ping: ' + state.latency, width, 10); 
+		ctx.fillText('ping: ' + state.latency + ' ms', width, 10); 
 	};
 	// damage indicator
 	if(state.damageIndicator.length !== 0) {
@@ -1250,10 +1253,10 @@ Game.prototype.drawFrame = function() {
 	this.drawMinimap();
 }
 Game.prototype.updateOtherPlayers = function() {
-	let array = state.playersArray.slice();
-	array = array.filter(obj => {
-		return obj.playerId !== state.playerId
-	});
+	const array = [];
+	state.playersArray.map(obj => {
+		if (obj.playerId !== state.playerId) array.push(obj)
+	})
 	this.otherPlayers = array;
 	// clear hit zone
 	state.hitZone = [];
@@ -1271,7 +1274,7 @@ Game.prototype.updateOtherPlayers = function() {
 				rayAngleArray = this.rayAngleArray.slice(),
 				width = CONST.getWindowWidth(),
 				height = CONST.getWindowHeight(),
-				jumpHeight = otherPlayer.currentJumpHeight,
+				jumpHeight = otherPlayer.accumulatedJumpHeight,
 				remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
 			let anotherPlayersAngleToMainPlayer;
 			// dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
@@ -1340,7 +1343,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
 		distance = z,
 		playerCurrentWidth = Math.min((3 * playerMaxWidth / z) * 0.8, playerMaxWidth),
 		playerCurrentHeight = Math.min((3 * playerMaxHeight / z) * 0.8, playerMaxHeight),
-		playerCurrentJumpHeight = Math.min(6 * otherPlayer.currentJumpHeight / z, otherPlayer.currentJumpHeight);
+		playerCurrentJumpHeight = Math.min(6 * otherPlayer.accumulatedJumpHeight / z, otherPlayer.accumulatedJumpHeight);
 
 	const remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
 	const end = remapAngleToZeroToTwoPI(rayAngleArray[rayAngleArray.length - 1]);
@@ -1477,7 +1480,7 @@ Game.prototype.attachEventListeners = function() {
 							player.backward = true;
 							break;
 						case 32:
-							if(!state.currentJumpVelocity) state.currentJumpVelocity = param.getInitialJumpVelocity();
+							if(!state.accumulatedJumpHeight) state.currentJumpVelocity = param.getInitialJumpVelocity();
 							break;
 						case 77:
 							const isTogglingMiniMap = state.isTogglingMiniMap;
@@ -1522,6 +1525,10 @@ Game.prototype.respawnFrame = function() {
 	if (timeDiff > 5000) {
 		this.mainPlayer.respawn()
 	};
+	// 
+	if (state.isConnectedToServer) {
+		serverConnection.upLinkUpdatePosition();
+	};
 
 	// animation
 	if (this.respawnFramethrottler % 4 === 0) {
@@ -1564,7 +1571,6 @@ Game.prototype.frame = function() {
 	if (state.isConnectedToServer) {
 		serverConnection.upLinkUpdatePosition();
 		this.updateOtherPlayers();
-		if (state.hitPlayerArray.length !== 0) serverConnection.upLinkHit(); /* hitPlayerArray rest in uplinkhit() */
 	}
 	this.ray();
 	this.drawFrame();
@@ -1592,55 +1598,29 @@ function ServerConnection() {
 	this.ws;
 }
 ServerConnection.prototype.initiateConnection = function() {
-	const HOST = location.origin.replace(/^http/, 'ws')
+	const HOST = location.origin.replace(/^http/, 'ws');
 	const ws = new WebSocket(HOST);
 	this.ws = ws;
 
 	ws.onopen = function() {
 		state.updateServerMessage('Connected to the server');
 		const requestJoinGame = {
-			type: 'requestJoinGame',
-			payload: '',
-			playerId: ''
+			what: 'upLinkRequestJoinGame',
 		};
 		ws.send(JSON.stringify(requestJoinGame));
 	};
 
 	ws.onmessage = (e) => {
 		const received = JSON.parse(e.data);
-		if (received.type === 'serverMessage') {
+		if (received.what === 'downLinkUpdatePosition') {
+			this.handleDownLinkUpdatePosition(received)
+		} else if (received.what === 'serverMessage') {
 			// serverMessage that need to be post to serverMessageComponent
 			state.updateServerMessage(received.payload);
-		} else if (received.type === 'playerId') {
+		} else if (received.what === 'downLinkRequestJoinGame') {
 			// set _id for this player
-			state.playerId = received.payload;
-			state.updateServerMessage('Your ID is: ' + received.payload);
-			// start ping
-			this.ping();
-		} else if (received.type === 'downLinkInitiatePlayerObj') {
-			this.handleDownLinkInitiatePlayerObj(received);
-			// start update position to server
-			state.isConnectedToServer = true;
-		} else if (received.type === 'pingBack') {
-			const pingSent = new Date(received.payload);
-			const now = new Date();
-			const latency = Math.floor((now - pingSent) / 2);
-			state.latency = latency + ' ms';
-			//
-			setTimeout(() => this.ping(), 1000);
-		} else if (received.type === 'downLinkUpdatePosition') {
-			this.handleDownLinkUpdatePosition(received)
-		} else if (received.type === 'downLinkUpdateHitBy') {
-			this.handleDownLinkUpdateHitBy(received)
-		} else if (received.type === 'downLinkSomeoneLogout') {
-			this.handleDownLinkSomeoneLogout(received)
-		} else if (received.type === 'downLinkSomeoneRespawning') {
-			this.handleDownLinkSomeoneRespawning(received)
-		} else if (received.type === 'downLinkSomeoneRespawned') {
-			this.handleDownLinkSomeoneRespawned(received)
-		} else if (received.type === 'downLinkUpdateKillNDeath') {
-			this.handleDownLinkUpdateKillNDeath(received)
-		}
+			this.handleDownLinkRequestJoinGame(received)
+		};
 	}
 
 	ws.onerror = (e) => console.log(e);
@@ -1649,139 +1629,79 @@ ServerConnection.prototype.initiateConnection = function() {
 		state.isConnectedToServer = false;
 	}
 }
-
-ServerConnection.prototype.ping = function() {
-	const now = new Date();
-	this.ws.send(JSON.stringify({type: 'ping', payload: now, playerId: state.playerId}));
+ServerConnection.prototype.handleDownLinkRequestJoinGame = function(received) {
+	const myID = received.payload;
+	state.playerId = myID;
+	state.isConnectedToServer = true;
 }
 ServerConnection.prototype.upLinkUpdatePosition = function() {
-	const player = game.mainPlayer;
-	const data = {
+	const payload = {
 		playerId: state.playerId,
-		x: player.x,
-		y: player.y,
-		currentJumpHeight: state.accumulatedJumpHeight,
-		latency: state.latency
+		x: game.mainPlayer.x,
+		y: game.mainPlayer.y,
+		accumulatedJumpHeight: state.accumulatedJumpHeight,
+		healthPoint: state.healthPoint,
+		death: state.death,
+		latency: state.latency,
+		timeSent: new Date(),
+		isRespawning: state.isRespawning,
+		hitPlayerArray: state.hitPlayerArray
 	};
-	this.ws.send(JSON.stringify({type: 'upLinkUpdatePosition', payload: data, playerId: state.playerId}));
-}
-ServerConnection.prototype.upLinkHit = function() {
-	const playerId = state.playerId;
-	const data = state.hitPlayerArray.slice();
-	this.ws.send(JSON.stringify({type: 'upLinkHit', payload: data, playerId: state.playerId}));
-	// reset hitPlayerArray after data sent
+	if (state.killedBy) {
+		payload.killedBy = state.killedBy
+	}
+	const data = {
+		what: 'upLinkUpdatePosition',
+		payload: payload,
+		playerId: state.playerId,
+	};
+	this.ws.send(JSON.stringify(data));
+
+	//reset after sent
 	state.hitPlayerArray = [];
-}
-ServerConnection.prototype.upLinkDeath = function(hitBy) {
-	const playerId = state.playerId;
-	const data = hitBy;
-	//
-	state.updateServerMessage('You were killed by ' + hitBy);
-	state.playersArray.map(obj => {
-		if (obj.playerId === state.playerId) {
-			obj.death ++;
-		} else if (obj.playerId === state.hitBy) {
-			obj.kill ++;
-		}
-	})
-	//
-	this.ws.send(JSON.stringify({type: 'upLinkDeath', payload: data, playerId: state.playerId}));
-}
-ServerConnection.prototype.upLinkRespawn = function() {
-	this.ws.send(JSON.stringify({type: 'upLinkRespawn', payload: '', playerId: state.playerId}));
-}
-ServerConnection.prototype.handleDownLinkInitiatePlayerObj = function(received) {
-	const array = received.payload;
-	state.playersArray = array;
+	state.killedBy = null;
 }
 ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
-	let array = state.playersArray.slice();
-	const receivedObj = received.payload;
-	const idNeedUpdate = receivedObj.playerId;
-	if (array.length === 0) {
-		// new and first player joined
-		state.playersArray.push(receivedObj);
-		return
-	} 
-
-	array = array.filter(obj => obj.playerId === idNeedUpdate);
-	if (array.length === 0) {
-		// new player joined
-		state.playersArray.push(receivedObj)
-	} else {
-		array = state.playersArray.slice();
-		array.map(obj => {
-			if (obj.playerId === idNeedUpdate) {
-				obj.x = receivedObj.x,
-				obj.y = receivedObj.y,
-				obj.currentJumpHeight = receivedObj.currentJumpHeight,
-				obj.latency = receivedObj.latency;
-				obj.kill = receivedObj.kill;
-				obj.death = receivedObj.death;
+	//console.log(received);
+	state.playersArray = received.payload.slice();
+	//
+	let mainPlayerObj = received.payload.filter((obj) => obj.playerId === state.playerId);
+	mainPlayerObj = mainPlayerObj[0];
+	// calc latency
+	const now = new Date();
+	const latency = Math.floor((now - new Date(mainPlayerObj.timeSent)) / 2);
+	state.latency = latency;
+	// calc damage
+	if (mainPlayerObj.hitBy) {
+		if (mainPlayerObj.hitBy.length !== 0) {
+			for (let i=0; i<mainPlayerObj.hitBy.length; i++) {
+				const damage = Math.floor(Math.random() * 10 + 5);
+				const hpAfterDamage = state.healthPoint - damage;
+				if (hpAfterDamage <= 0) {
+					state.death++;
+					state.isRespawning = true;
+					state.healthPoint = 0;
+					state.killedBy = mainPlayerObj.hitBy[i];
+					state.updateServerMessage('You were killed by ' + mainPlayerObj.hitBy[i]);
+					const hpEl = document.getElementById('playerStatusHealthPoint');
+					hpEl.innerHTML = state.healthPoint;
+					break;
+				} else {
+					state.healthPoint = hpAfterDamage;
+					const hpEl = document.getElementById('playerStatusHealthPoint');
+					hpEl.innerHTML = state.healthPoint;
+				}
 			}
-		});
-		state.playersArray = array;
+		}
+	}
+	// update info related to this player
+	state.kill = mainPlayerObj.kill;
+	if (mainPlayerObj.killerOf) {
+		state.updateServerMessage('You killed ' + mainPlayerObj.killerOf);
 	}
 }
-ServerConnection.prototype.handleDownLinkUpdateHitBy = function (received) {
-	if (!state.isRespawning) {
-		const 
-			hitBy = received.payload,
-			damage = Math.floor(Math.random() * 10 + 5),
-			hp = state.healthPoint,
-			hpAfterDamage = hp - damage;
-		if (hpAfterDamage > 0) {
-			state.healthPoint = hpAfterDamage;
-		} else {
-			state.healthPoint = 0;
-			state.isRespawning = true;
-			this.upLinkDeath(hitBy);
-		}
-	state.damageIndicator.push(hitBy);
-	const hpEl = document.getElementById('playerStatusHealthPoint');
-	hpEl.innerHTML = state.healthPoint;
-	}
-}
-ServerConnection.prototype.handleDownLinkSomeoneLogout = function (received) {
-	const whoLogout = received.payload;
-	let array = state.playersArray.slice();
-	array = array.filter(obj => obj.playerId !== whoLogout);
-	state.playersArray = array;
-	const playerCount = array.length + 1;
-	const message = 'Player ' + whoLogout + ' has disconnected. There are ' + playerCount + ' players online.'
-	state.updateServerMessage(message);
-}
-ServerConnection.prototype.handleDownLinkSomeoneRespawning = function (received) {
-	const whoWasKilledId = received.payload;
-	state.playersArray.map(obj => {
-		if (obj.playerId === whoWasKilledId) {
-			obj.isRespawning = true
-		}
-	})
-}
-ServerConnection.prototype.handleDownLinkSomeoneRespawned = function (received) {
-	const whoRespawnedId = received.payload;
-	state.playersArray.map(obj => {
-		if (obj.playerId === whoRespawnedId) {
-			obj.isRespawning = false
-		}
-	})
-}
-ServerConnection.prototype.handleDownLinkUpdateKillNDeath = function (received) {
-	const 
-		payload = received.payload,
-		whoWasKilled = payload.whoWasKilled,
-		death = payload.death,
-		killedBy = payload.killedBy,
-		kill = payload.kill;
-	state.playersArray.map(obj => {
-		if (obj.playerId === whoWasKilled) {
-			obj.death = death
-		} else if (obj.playerId === killedBy) {
-			obj.kill = kill
-		}
-	})
-}
+
+
 
 function Loading() {
 	this.loaded = 0;
@@ -2123,7 +2043,8 @@ ScoreBoardComponent.prototype.toggleDisplay = function() {
 ScoreBoardComponent.prototype.updateData = function() {
 	if (this.isDisplaying) {
 		// sort state.playersArray
-		state.playersArray.sort((a, b) => b.kill - a.kill)
+		const playersArray = state.playersArray.slice();
+		playersArray.sort((a, b) => b.kill - a.kill)
 
 		// components
 		const playerId = state.playerId;
@@ -2153,12 +2074,12 @@ ScoreBoardComponent.prototype.updateData = function() {
 		title.appendChild(latency);
 		this.component.appendChild(title);
 
-		state.playersArray.map(obj => {
+		playersArray.map(obj => {
 			const row = obj.playerId === playerId ? createRow(true) : createRow(false);
 			const id = createRowItem(obj.playerId);
 			const kill = createRowItem(obj.kill);
 			const death = createRowItem(obj.death);
-			const latency = createRowItem(obj.latency);
+			const latency = createRowItem(obj.latency + 'ms');
 			row.appendChild(id);
 			row.appendChild(kill);
 			row.appendChild(death);
