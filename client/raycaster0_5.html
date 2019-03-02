@@ -307,7 +307,7 @@ a:hover {
 			gun: './assets/gun.png',
 			muzzle: './assets/muzzle.png',
 			emptyBullet: './assets/bullet.png',
-			soilder: './assets/soilder.png',
+			soilder: './assets/soilder.png'
 		};
 	GlobalVar.prototype.getWindowWidth = function() {
 		return width
@@ -749,6 +749,17 @@ Player.prototype.move = function() {
 			const baseWidthToZ = Math.min(baseWidth, baseWidth * 2 / state.bulletHitZ);
 			const radius = Math.min(5, 20 / state.bulletHitZ);
 			if (!state.bulletHitConfirmed) {
+				const crater = {
+					type: 'crater',
+					timeStamp: now,
+					x: state.bulletHitX,
+					y: state.bulletHitY,
+					radius: 0.8 * radius,
+					playerAlpha: this.alpha,
+					opacity: 1,
+					accumulatedJumpHeight: state.accumulatedJumpHeight
+				};
+				state.bulletHitSparks.push(crater);
 				for (let i=0; i<5; i++) {
 					let sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.1;
 					let sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.05;
@@ -1227,13 +1238,16 @@ Game.prototype.drawFrame = function() {
 				obj.y += obj.speedY;
 				obj.opacity -= 0.001;
 				obj.radius *= 0.99;
+			} else if (obj.type === 'crater') {
+				obj.opacity -= 0.003;
 			}
 		});
 
 		state.bulletHitSparks.map((obj) => {
 			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.opacity+')' : 
 							obj.type === 'blood' ? 'rgba(255,0,0,'+obj.opacity+')' :
-							'rgba(50,50,50,'+obj.opacity+')';
+							obj.type === 'dirt' ? 'rgba(50,50,50,'+obj.opacity+')' :
+							'rgba(0,0,0,'+obj.opacity+')';
 			ctx.beginPath();
 			ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
 			ctx.fill();
