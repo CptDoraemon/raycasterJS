@@ -6,7 +6,7 @@ function ServerConnection() {
     this.ws;
 }
 ServerConnection.prototype.initiateConnection = function() {
-    const HOST = location.origin.replace(/^http/, 'ws');
+    const HOST = Location.host ? location.origin.replace(/^http/, 'ws') : 'ws://localhost:5000/';
     const ws = new WebSocket(HOST);
     this.ws = ws;
 

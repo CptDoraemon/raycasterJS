@@ -626,8 +626,7 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
         playerCurrentJumpHeight = Math.min(6 * otherPlayer.accumulatedJumpHeight / z, otherPlayer.accumulatedJumpHeight);
 
     const remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
-    const end = remapAngleToZeroToTwoPI(rayAngleArray[rayAngleArray.length - 1]);
-    let start = remapAngleToZeroToTwoPI(rayAngleArray[0]);
+    let start = remapAngleToZeroToTwoPI(this.rayAngleArray[0]);
 
     if (anotherPlayersAngleToMainPlayer < start) {
         // this function is called when another player is garanteed in sight
