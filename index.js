@@ -11,13 +11,13 @@ const server = http.createServer(app);
 server.listen(port);
 const wss = new WebSocket.Server({ server: server });
 
-app.use(express.static('client'));
+app.use(express.static('./client/dist'));
 app.use(bodyParser.json());
 //app.use(bodyParser.urlencoded({ extended: true }));
 
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname  + '/client/raycaster0_5.html'));
+    res.sendFile(path.join(__dirname  + '/client/dist/index.html'));
 });
 
 function State() {
@@ -162,8 +162,8 @@ function checkTimeout() {
 				state.wsArray.map((wsObj) => {
 					if (wsObj.playerId === playerObj.playerId) {
 						wsObj.ws.close()
-					};
-				})
+					}
+				});
 				const modifiedWsArray = state.wsArray.filter((wsObj) => {
 					return wsObj.playerId !== playerObj.playerId
 				});
