@@ -307,7 +307,7 @@ a:hover {
 			gun: './assets/gun.png',
 			muzzle: './assets/muzzle.png',
 			emptyBullet: './assets/bullet.png',
-			soilder: './assets/soilder.png'
+			soilder: './assets/soilder.png',
 		};
 	GlobalVar.prototype.getWindowWidth = function() {
 		return width
@@ -336,7 +336,7 @@ const CONST = new GlobalVar();
 		//
 		this.healthPointMax = 100;
 		this.currentMagzineMax = 30;
-		this.totalMagzineMax = 240;
+		this.totalMagzineMax = 480;
 		//
 		this.recoilStaticMax = 10;
 		this.recoilMovingMax = 100;
@@ -762,7 +762,8 @@ Player.prototype.move = function() {
 						z: state.bulletHitZ,
 						radius: radius * 0.5,
 						opacity: 0.8,
-						playerAlpha: this.alpha
+						playerAlpha: this.alpha,
+						accumulatedJumpHeight: state.accumulatedJumpHeight,
 					};
 					sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.5;
 					sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.5;
@@ -776,7 +777,8 @@ Player.prototype.move = function() {
 						z: state.bulletHitZ,
 						radius: radius,
 						opacity: 1,
-						playerAlpha: this.alpha
+						playerAlpha: this.alpha,
+						accumulatedJumpHeight: state.accumulatedJumpHeight,
 					};
 					state.bulletHitSparks.push(dirt, spark);
 				}
@@ -794,7 +796,8 @@ Player.prototype.move = function() {
 						z: state.bulletHitZ,
 						radius: radius,
 						opacity: 1,
-						playerAlpha: this.alpha
+						playerAlpha: this.alpha,
+						accumulatedJumpHeight: state.accumulatedJumpHeight,
 					};
 					state.bulletHitSparks.push(blood);	
 				}			
@@ -1132,7 +1135,7 @@ Game.prototype.drawFrame = function() {
 	const wallDistArray = this.wallDistArray.slice();
 	wallDistArray.map((i, index) => {
 		const 
-			columnHeightPercent = 3 / i,
+			columnHeightPercent = Math.min(3 / i, 1.5),
 			halfWallHeight = 0.5 * columnHeightPercent * height,
 			mid = 0.5 * height,
 			wallStart = mid - halfWallHeight,
@@ -1188,13 +1191,18 @@ Game.prototype.drawFrame = function() {
 		state.bulletHitSparks.map((obj) => {
 			if (now - obj.timeStamp < 500) {
 				const shiftAlpha = playerAlphaNow - obj.playerAlpha;
+				const shiftY = state.accumulatedJumpHeight - obj.accumulatedJumpHeight;
 				if (shiftAlpha) {
 					// let shiftX = Math.tan(shiftAlpha) * obj.z; /* shift on map grid */
 					// shiftX =  Math.min(screenWidth * shiftX / obj.z, screenWidth); /* shift on screen */
 					const shiftX = Math.min(screenWidth * Math.tan(shiftAlpha), screenWidth);
 					obj.x -= shiftX;
 					obj.playerAlpha = playerAlphaNow;
-				}
+				};
+				if (shiftY) {
+					obj.y += shiftY;
+					obj.accumulatedJumpHeight = state.accumulatedJumpHeight;
+				};
 				newArray.push(obj);
 			}
 		});
@@ -1210,19 +1218,22 @@ Game.prototype.drawFrame = function() {
 				obj.speedY += gravityToZ;
 				obj.y += obj.speedY;
 				obj.opacity -= 0.003;
-			} else {
+				obj.radius *= 0.99;
+			} else if (obj.type === 'spark' || obj.type === 'blood') {
 				// sparks and blood
 				obj.x += obj.speedX;
 				obj.speedX *= 0.999;
 				obj.speedY += gravityToZ;
 				obj.y += obj.speedY;
 				obj.opacity -= 0.001;
+				obj.radius *= 0.99;
 			}
-			obj.radius *= 0.99;
 		});
 
 		state.bulletHitSparks.map((obj) => {
-			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.opacity+')' : obj.type === 'dirt' ? 'rgba(50,50,50,'+obj.opacity+')' : 'rgba(255,0,0,'+obj.opacity+')';
+			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.opacity+')' : 
+							obj.type === 'blood' ? 'rgba(255,0,0,'+obj.opacity+')' :
+							'rgba(50,50,50,'+obj.opacity+')';
 			ctx.beginPath();
 			ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
 			ctx.fill();
