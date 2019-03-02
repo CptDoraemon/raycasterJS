@@ -759,8 +759,10 @@ Player.prototype.move = function() {
 						timeStamp: now,
 						x: state.bulletHitX,
 						y: state.bulletHitY,
+						z: state.bulletHitZ,
 						radius: radius * 0.5,
-						alpha: 0.8
+						opacity: 0.8,
+						playerAlpha: this.alpha
 					};
 					sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.5;
 					sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.5;
@@ -771,8 +773,10 @@ Player.prototype.move = function() {
 						timeStamp: now,
 						x: state.bulletHitX,
 						y: state.bulletHitY,
+						z: state.bulletHitZ,
 						radius: radius,
-						alpha: 1
+						opacity: 1,
+						playerAlpha: this.alpha
 					};
 					state.bulletHitSparks.push(dirt, spark);
 				}
@@ -787,8 +791,10 @@ Player.prototype.move = function() {
 						timeStamp: now,
 						x: state.bulletHitX,
 						y: state.bulletHitY,
+						z: state.bulletHitZ,
 						radius: radius,
-						alpha: 1
+						opacity: 1,
+						playerAlpha: this.alpha
 					};
 					state.bulletHitSparks.push(blood);	
 				}			
@@ -932,8 +938,7 @@ Game.prototype.ray = function() {
 	let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * this.fov;
 	//
 	for (let i = 0; i < width; i += resolution) {
-		rayAngleArray.push(rayAngle);
-		rayAngle += dAlpha;
+		rayAngleArray.push(rayAngle += dAlpha);
 	}
 	//
 	rayAngleArray.map((i, index) => {
@@ -948,7 +953,7 @@ Game.prototype.ray = function() {
 		raydistArrayFishEyeCorrected.push(dist * fishEyeCorrection);
 		hitDirectionArray.push(hitDirection);
 		hitWallTypeArray.push(hitWallType);
-	})
+	});
 	// update arrays in properties
 	this.wallDistArrayBeforeFishEyeCorrection = raydistArray;
 	this.wallDistArray = raydistArrayFishEyeCorrected;
@@ -1175,35 +1180,49 @@ Game.prototype.drawFrame = function() {
 
 	// bullet sparks: move all sparks already existed, move is here because there are more than 1 move-draw cycle in one frame; 
 	// before gun due to layer priority
-	function moveBulletSparks() {
+	const prepareBulletSparksBeforeMove = () => {
 		const now = new Date();
 		const newArray = [];
-		const gravity = CONST.getWindowWidth() * 0.000005;
-		const gravityToZ = Math.min(gravity, gravity * 2 / state.bulletHitZ);
+		const playerAlphaNow = this.mainPlayer.alpha;
+		const screenWidth = CONST.getWindowWidth();
 		state.bulletHitSparks.map((obj) => {
 			if (now - obj.timeStamp < 500) {
-				if (obj.type === 'dirt') {
-					obj.x += obj.speedX;
-					obj.speedX *= 0.9;
-					obj.speedY += gravityToZ;
-					obj.y += obj.speedY;
-					obj.alpha -= 0.003;
-				} else {
-					// sparks and blood
-					obj.x += obj.speedX;
-					obj.speedX *= 0.999;
-					obj.speedY += gravityToZ;
-					obj.y += obj.speedY;
-					obj.alpha -= 0.001;
+				const shiftAlpha = playerAlphaNow - obj.playerAlpha;
+				if (shiftAlpha) {
+					// let shiftX = Math.tan(shiftAlpha) * obj.z; /* shift on map grid */
+					// shiftX =  Math.min(screenWidth * shiftX / obj.z, screenWidth); /* shift on screen */
+					const shiftX = Math.min(screenWidth * Math.tan(shiftAlpha), screenWidth);
+					obj.x -= shiftX;
+					obj.playerAlpha = playerAlphaNow;
 				}
-				obj.radius *= 0.99;
 				newArray.push(obj);
 			}
-		})
+		});
 		state.bulletHitSparks = newArray;
+	}
+	const moveBulletSparks = () => {
+		const gravity = CONST.getWindowWidth() * 0.000005;
+		state.bulletHitSparks.map((obj) => {
+			const gravityToZ = Math.min(gravity, gravity * 2 / obj.z);
+			if (obj.type === 'dirt') {
+				obj.x += obj.speedX;
+				obj.speedX *= 0.9;
+				obj.speedY += gravityToZ;
+				obj.y += obj.speedY;
+				obj.opacity -= 0.003;
+			} else {
+				// sparks and blood
+				obj.x += obj.speedX;
+				obj.speedX *= 0.999;
+				obj.speedY += gravityToZ;
+				obj.y += obj.speedY;
+				obj.opacity -= 0.001;
+			}
+			obj.radius *= 0.99;
+		});
 
 		state.bulletHitSparks.map((obj) => {
-			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.alpha+')' : obj.type === 'dirt' ? 'rgba(50,50,50,'+obj.alpha+')' : 'rgba(255,0,0,'+obj.alpha+')';
+			ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.opacity+')' : obj.type === 'dirt' ? 'rgba(50,50,50,'+obj.opacity+')' : 'rgba(255,0,0,'+obj.opacity+')';
 			ctx.beginPath();
 			ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
 			ctx.fill();
@@ -1211,6 +1230,7 @@ Game.prototype.drawFrame = function() {
 	}
 	// bullet sparks: before gun due to layer priority
 	if (state.bulletHitSparks.length !== 0) {
+		prepareBulletSparksBeforeMove();
 		for (let i=0; i<10; i++) {
 			moveBulletSparks()
 		}
