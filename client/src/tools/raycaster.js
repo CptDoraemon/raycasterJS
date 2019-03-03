@@ -1,11 +1,15 @@
 import { param } from "../param";
 
-function raycaster(x, y, alpha, pointerAlpha) {
+function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
     // input origin x,y and angle alpha, return distance.
+    //
+    const playerHeight = 2;
+    const halfYFov = Math.PI / 8 * 2; /* 40 deg, 3:2 */
+    //
     const
         mapWidth = param.getMapGrid()[0].length,
-        mapHeight = param.getMapGrid().length,
-        hitCoordinate = [];
+        mapHeight = param.getMapGrid().length;
+    let hitCoordinate = [];
     // convert to normal coordinate system
     y = mapHeight - 1 - y;
     alpha += Math.PI * 0.5;
@@ -47,7 +51,7 @@ function raycaster(x, y, alpha, pointerAlpha) {
             }
 
             const checkHitResult = checkHit(x, y, sin, cos, hitDirection, mapWidth - 1, mapHeight - 1);
-            if (checkHitResult !== 0) {
+            if (checkHitResult !== 0 && checkHitResult !== 999) {
                 const dist = Math.pow((x - originX) * (x - originX) + (y - originY) * (y - originY), 0.5);
                 const distFishEyeCorrected = dist * Math.cos(alpha - pointerAlpha - Math.PI * 0.5);
                 hitCoordinate.push(
@@ -57,7 +61,8 @@ function raycaster(x, y, alpha, pointerAlpha) {
                         hitDirection: hitDirection,
                         hitWallType: checkHitResult,
                         dist: dist,
-                        distFishEyeCorrected: distFishEyeCorrected
+                        distFishEyeCorrected: distFishEyeCorrected,
+                        wallType: checkHitResult,
                     });
             }
             if (checkHitResult !== 999) {
@@ -65,8 +70,31 @@ function raycaster(x, y, alpha, pointerAlpha) {
             }
         }
         loop();
-    //
-    return hitCoordinate;
+
+    // discard shorter walls not in sight
+    const hitCoordinateFiltered = [];
+    let blockingAlpha = -10;
+    hitCoordinate.map((obj) => {
+        const wallHeight = param.getWallTypeInfo()[obj.wallType].height;
+        const sightHeight = playerHeight + accumulatedJumpHeight;
+        const thisBlockingAlpha = wallHeight === sightHeight ? 0 : Math.atan((wallHeight - sightHeight) / obj.distFishEyeCorrected);
+        if (thisBlockingAlpha > blockingAlpha) {
+            hitCoordinateFiltered.push(obj);
+            blockingAlpha = thisBlockingAlpha;
+        }
+    });
+    hitCoordinateFiltered.sort((a, b) => {
+        return b.dist - a.dist
+    });
+    // calc height
+    hitCoordinateFiltered.map((obj) => {
+        // 45 deg
+        const sightHeightAboveHorizon = playerHeight + accumulatedJumpHeight + obj.distFishEyeCorrected * Math.tan(halfYFov);
+        const sightHeight = 2 * obj.distFishEyeCorrected * Math.tan(halfYFov);
+        obj.wallStartYOnScreenPercent = Math.max(0, sightHeightAboveHorizon - param.getWallTypeInfo()[obj.wallType].height) / sightHeight;
+        obj.wallEndYOnScreenPercent = sightHeightAboveHorizon / sightHeight;
+    });
+    return hitCoordinateFiltered;
 }
 
 function checkHit (x, y, sin, cos, hitDirection, xMax, yMax) {

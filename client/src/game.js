@@ -10,15 +10,10 @@ function Game() {
     this.mainPlayer = null;
     this.otherPlayers = [];
     //
-    this.wallDistArray = [];
-    this.hitWallTypeArray = [];
-    this.hitDirectionArray = [];
+    this.wallArray = [];
     this.rayAngleArray = [];
-    this.wallDistArrayBeforeFishEyeCorrection = []; // for drawing ray on minimap
     this.fov = Math.PI / 3; //60 degree
     this.dAlpha = null; /* angle between rays */
-    // get vars from param
-    this.mapGrid = param.getMapGrid();
     //
     this.drawDamageIndicatorArray = [];
     //
@@ -64,13 +59,8 @@ Game.prototype.ray = function() {
     //Prepare rayArray
     const
         rayAngleArray = [],
-        raydistArray = [],
-        raydistArrayFishEyeCorrected = [],
-        hitDirectionArray = [],
-        hitWallTypeArray = [],
-        mapGrid = this.mapGrid,
+        wallArray = [],
         width = CONST.getWindowWidth(),
-        height = CONST.getWindowHeight(),
         resolution = param.resolution,
         dAlpha = (this.fov / (width / resolution));
     this.dAlpha = dAlpha;
@@ -79,26 +69,13 @@ Game.prototype.ray = function() {
     for (let i = 0; i < width; i += resolution) {
         rayAngleArray.push(rayAngle += dAlpha);
     }
+    this.rayAngleArray = rayAngleArray;
     //
     rayAngleArray.map((i, index) => {
-        const
-            result = raycaster(this.mainPlayer.x, this.mainPlayer.y, rayAngleArray[index], this.mainPlayer.alpha),
-            dist = result[0].dist,
-            hitDirection = result[0].hitDirection,
-            hitWallType = result[0].hitWallType,
-            distFishEyeCorrected = result[0].distFishEyeCorrected;
-
-        raydistArray.push(dist);
-        raydistArrayFishEyeCorrected.push(distFishEyeCorrected);
-        hitDirectionArray.push(hitDirection);
-        hitWallTypeArray.push(hitWallType);
+        const result = raycaster(this.mainPlayer.x, this.mainPlayer.y, rayAngleArray[index], this.mainPlayer.alpha, state.accumulatedJumpHeight);
+        wallArray.push(result);
     });
-    // update arrays in properties
-    this.wallDistArrayBeforeFishEyeCorrection = raydistArray;
-    this.wallDistArray = raydistArrayFishEyeCorrected;
-    this.hitWallTypeArray = hitWallTypeArray;
-    this.hitDirectionArray = hitDirectionArray;
-    this.rayAngleArray = rayAngleArray;
+    this.wallArray = wallArray;
 };
 Game.prototype.drawFrame = function() {
     const
@@ -119,35 +96,36 @@ Game.prototype.drawFrame = function() {
         direction = cameraAngle > 0 ?
             cameraAngle / twoPI :
             (twoPI + cameraAngle) / twoPI;
-
-    ctx.drawImage(sky, direction*skyWidth, 0, 0.25*skyWidth, skyHeight, 0, 0, width, 0.6*height);
-    if (direction >= 0.75) {
-        ctx.drawImage(sky, 0, 0, 0.25*skyWidth, skyHeight, (1-direction)/0.25*width, 0, width, 0.6*height);
-    }
+    ctx.beginPath();
+    ctx.fillStyle = 'rgb(0, 172, 237)';
+    ctx.fillRect(0, 0, width, 0.5 * height);
+    ctx.fill();
+    // if (5/6*twoPI <= direction && direction <= twoPI) {
+    //     const overlay = direction - 5/6*twoPI;
+    //     ctx.drawImage(sky, direction*skyWidth, 0, skyWidth, skyHeight, 0, 0, width, 0.6*height);
+    // } else {
+    //     ctx.drawImage(sky, direction*skyWidth, 0, 1/6*skyWidth, skyHeight, 0, 0, width, 0.6*height);
+    // }
+    // if (direction >= 0.75) {
+    //     ctx.drawImage(sky, 0, 0, 0.25*skyWidth, skyHeight, (1-direction)/0.25*width, 0, width, 0.6*height);
+    // }
 // floor
     ctx.beginPath();
     ctx.fillStyle = 'rgba(150,150,150,1)';
     ctx.fillRect(0, 0.5 * height, width, 0.5 * height);
     ctx.fill();
 // wall
-    const wallDistArray = this.wallDistArray.slice();
-    wallDistArray.map((i, index) => {
-        const
-            columnHeightPercent = Math.min(3 / i, 1.5),
-            halfWallHeight = 0.5 * columnHeightPercent * height,
-            mid = 0.5 * height,
-            wallStart = mid - halfWallHeight,
-            wallEnd = mid + halfWallHeight,
-            hitWallType = this.hitWallTypeArray[index],
-            hitDirection = this.hitDirectionArray[index],
-            resolution = param.resolution;
-
-        const wallColorArray = param.getWallColorArray();
-        const wallColor = wallColorArray[hitWallType - 1][hitDirection];
-        ctx.fillStyle = wallColor;
-        ctx.beginPath();
-        ctx.fillRect(index * resolution, wallStart + state.accumulatedJumpHeight, resolution, wallEnd - wallStart);
-        ctx.fill();
+    this.wallArray.map((arr, index) => {
+        arr.map(obj => {
+            const
+                resolution = param.resolution,
+                wallStart = obj.wallStartYOnScreenPercent * height,
+                wallEnd = obj.wallEndYOnScreenPercent * height;
+            ctx.fillStyle = obj.hitDirection === 0 ? param.getWallTypeInfo()[obj.hitWallType].color : param.getWallTypeInfo()[obj.hitWallType].shade;
+            ctx.beginPath();
+            ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
+            ctx.fill();
+        });
     });
 
     // otherplayer
@@ -539,12 +517,10 @@ Game.prototype.drawMinimap = function() {
     const
         ctx = document.getElementById('mainCanvas').getContext('2d'),
         miniMapMargin /* eg: top =left = 10px */= this.miniMapMargin,
-        mapGrid = this.mapGrid.slice(),
+        mapGrid = param.getMapGrid(),
         mapGridSize /* it's a square */ = mapGrid.length,
         miniMapSize /* it's a square */ = this.miniMapSize,
         pixel /* unit pixel for one grid, eg: 200/40=5px */ = miniMapSize / mapGridSize,
-        rayAngleArray = this.rayAngleArray.slice(),
-        wallDistArray = this.wallDistArrayBeforeFishEyeCorrection.slice(),
         playerXOnMinimap = this.mainPlayer.x * pixel + miniMapMargin,
         playerYOnMinimap = this.mainPlayer.y * pixel + miniMapMargin,
         isTogglingMiniMap /* 1: enlarging, 0: false, -1: shrinking */ = state.isTogglingMiniMap,
@@ -576,8 +552,8 @@ Game.prototype.drawMinimap = function() {
     ctx.arc(playerXOnMinimap, playerYOnMinimap, miniMapSize / 100, 0 , 2 * Math.PI);
     ctx.fill();
     // rays
-    rayAngleArray.map((i, index) => {
-        const thisRayLength = wallDistArray[index];
+    this.rayAngleArray.map((i, index) => {
+        const thisRayLength = this.wallArray[index][0].dist;
         ctx.strokeStyle = "rgba(0,255,0,0.01)";
         ctx.beginPath();
         ctx.moveTo(playerXOnMinimap, playerYOnMinimap);

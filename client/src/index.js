@@ -1,5 +1,3 @@
-import { CONST } from "./globalvar";
-import { Player } from "./player";
 import { Loading } from "./loading";
 
 

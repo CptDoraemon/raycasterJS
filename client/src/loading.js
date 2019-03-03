@@ -101,7 +101,7 @@ Loading.prototype.drawLoadingPage = function() {
             ctx.clearRect(0, 0, width, height);
             ctx.beginPath();
             ctx.fillStyle = 'rgb(0, 172, 237)';
-            ctx.moveTo(centerX, centerY)
+            ctx.moveTo(centerX, centerY);
             ctx.arc(centerX, centerY, radius, startingAngle, endingAngle += angleInOneFrame);
             ctx.fill();
         }
