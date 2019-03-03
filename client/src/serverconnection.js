@@ -2,8 +2,7 @@ import { state } from "./state";
 import { game } from "./game";
 
 function ServerConnection() {
-    this.lastPing;
-    this.ws;
+    this.ws = null;
 }
 ServerConnection.prototype.initiateConnection = function() {
     const HOST = location.hostname !== 'localhost' ? location.origin.replace(/^http/, 'ws') : 'ws://localhost:5000/';
@@ -38,8 +37,7 @@ ServerConnection.prototype.initiateConnection = function() {
     }
 };
 ServerConnection.prototype.handleDownLinkRequestJoinGame = function(received) {
-    const myID = received.payload;
-    state.playerId = myID;
+    state.playerId = received.payload;
     state.isConnectedToServer = true;
 };
 ServerConnection.prototype.upLinkUpdatePosition = function() {
@@ -52,7 +50,7 @@ ServerConnection.prototype.upLinkUpdatePosition = function() {
         death: state.death,
         latency: state.latency,
         timeSent: new Date(),
-        isRespawning: (state.isRepawnProtected || state.isRespawning) ? true : false,
+        isRespawning: state.isRepawnProtected || state.isRespawning,
         hitPlayerArray: state.hitPlayerArray
     };
     if (state.killedBy) {
@@ -77,8 +75,7 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
     mainPlayerObj = mainPlayerObj[0];
     // calc latency
     const now = new Date();
-    const latency = Math.floor((now - new Date(mainPlayerObj.timeSent)) / 2);
-    state.latency = latency;
+    state.latency = Math.floor((now - new Date(mainPlayerObj.timeSent)) / 2);
     // calc damage
     if (mainPlayerObj.hitBy && !state.isRespawning && !state.isRepawnProtected) {
         if (mainPlayerObj.hitBy.length !== 0) {

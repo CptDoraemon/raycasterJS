@@ -4,9 +4,10 @@ import { InstructionComponent, ToolBarComponent, PlayerStatusComponent, ServerMe
 import { state } from "./state";
 import { Player } from "./player";
 import { serverConnection } from "./serverconnection";
+import { raycaster } from "./tools/raycaster";
 
 function Game() {
-    this.mainPlayer;
+    this.mainPlayer = null;
     this.otherPlayers = [];
     //
     this.wallDistArray = [];
@@ -15,13 +16,13 @@ function Game() {
     this.rayAngleArray = [];
     this.wallDistArrayBeforeFishEyeCorrection = []; // for drawing ray on minimap
     this.fov = Math.PI / 3; //60 degree
-    this.dAlpha; /* angle between rays */
+    this.dAlpha = null; /* angle between rays */
     // get vars from param
     this.mapGrid = param.getMapGrid();
     //
     this.drawDamageIndicatorArray = [];
     //
-    this.deathTimeStamp; // used in respawn frame
+    this.deathTimeStamp = null; // used in respawn frame
     this.respawnFramethrottler = 1;
     //
     this.miniMapSizeMax = param.getMiniMapSizeMax();
@@ -36,9 +37,7 @@ Game.prototype.initiateCanvas = function() {
     rootDiv.appendChild(container);
     const width = CONST.getWindowWidth();
     const height = CONST.getWindowHeight();
-
-    const mainCanvas = `<canvas id="mainCanvas" width=${width} height=${height}>Your Browser Does Not Support Html5 Canvas</canvas>`;
-    container.innerHTML = mainCanvas;
+    container.innerHTML = `<canvas id="mainCanvas" width=${width} height=${height}>Your Browser Does Not Support Html5 Canvas</canvas>`;
 
     // instructionComponent
     const instructionComponent = new InstructionComponent();
@@ -83,14 +82,14 @@ Game.prototype.ray = function() {
     //
     rayAngleArray.map((i, index) => {
         const
-            result = raycaster(this.mainPlayer.x, this.mainPlayer.y, rayAngleArray[index]),
-            dist = result[0],
-            hitDirection = result[1],
-            hitWallType = result[2],
-            fishEyeCorrection = Math.abs(Math.cos(rayAngleArray[index] - this.mainPlayer.alpha));
+            result = raycaster(this.mainPlayer.x, this.mainPlayer.y, rayAngleArray[index], this.mainPlayer.alpha),
+            dist = result[0].dist,
+            hitDirection = result[0].hitDirection,
+            hitWallType = result[0].hitWallType,
+            distFishEyeCorrected = result[0].distFishEyeCorrected;
 
         raydistArray.push(dist);
-        raydistArrayFishEyeCorrected.push(dist * fishEyeCorrection);
+        raydistArrayFishEyeCorrected.push(distFishEyeCorrected);
         hitDirectionArray.push(hitDirection);
         hitWallTypeArray.push(hitWallType);
     });
@@ -100,144 +99,6 @@ Game.prototype.ray = function() {
     this.hitWallTypeArray = hitWallTypeArray;
     this.hitDirectionArray = hitDirectionArray;
     this.rayAngleArray = rayAngleArray;
-
-    // raycaster
-    function raycaster(x, y, alpha) {
-        //input origin x,y and angle alpha, return distance.
-        function checkHit (x, y) {
-            // hit if grid value is not 0
-            return mapGrid[y][x] !== 0
-        }
-        const
-            sin = Math.sin(alpha),
-            cos = Math.cos(alpha),
-            tan = Math.tan(alpha),
-            result = [];
-        // temp variables used for calculation
-        let vx, vy, hx, hy, dist, distV, distH, hitDirection /* 0: horizontal, 1:vertical */, hitWallType;
-
-        //2 tan>0 x++ y++
-        if (sin >= 0 && cos > 0) {
-            //vertical
-            vx = Math.ceil(x);
-            vy = Math.min(y + tan * (vx - x), 39);
-            while (!checkHit(Math.floor(vx),Math.floor(vy))) {
-                vx++;
-                vy = Math.min(vy + tan, 39);
-            }
-            //horizontal
-            hy = Math.ceil(y); //DO NOT REVERSE HY HX!
-            hx = x + (hy - y)/tan;
-            while (!checkHit(Math.floor(hx),Math.floor(hy))) {
-                hx += 1/tan;
-                hy++;
-            }
-            distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y), 0.5);
-            distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y), 0.5);
-            if (distV >= distH) {
-                dist = distH;
-                hitDirection = 0;
-                hitWallType = mapGrid[Math.floor(hy)][Math.floor(hx)];
-            } else {
-                dist = distV;
-                hitDirection = 1;
-                hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)];
-            }
-        }
-
-        //4 tan<0 x-- y++
-        if (sin > 0 && cos <= 0) {
-            //vertical
-            vx = Math.floor(x);
-            vy = Math.min(y + tan * (vx - x), 39);
-            while (!checkHit(Math.floor(vx)-1,Math.floor(vy))) {
-                vx--;
-                vy = Math.min(vy - tan, 39);
-            }
-            //horizontal
-            hy = Math.ceil(y); //DO NOT REVERSE HY HX!
-            hx = x + (hy - y)/tan;
-            while (!checkHit(Math.floor(hx),Math.floor(hy))) {
-                hx += 1/tan;
-                hy++;
-            }
-            distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y),0.5);
-            distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y),0.5);
-            if (distV >= distH) {
-                dist = distH;
-                hitDirection = 0;
-                hitWallType = mapGrid[Math.floor(hy)][Math.floor(hx)];
-            } else {
-                dist = distV;
-                hitDirection = 1;
-                hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)-1];
-            }
-        }
-
-        //6 tan>0 x-- y--
-        if (sin <= 0 && cos < 0) {
-            //vertical
-            vx = Math.floor(x);
-            vy = Math.max(y + tan * (vx - x), 1);
-            while (!checkHit(Math.floor(vx)-1,Math.floor(vy))) {
-                vx--;
-                vy = Math.max(vy - tan, 1);
-            }
-            //horizontal
-            hy = Math.floor(y); //DO NOT REVERSE HY HX!
-            hx = x + (hy - y)/tan;
-            while (!checkHit(Math.floor(hx),Math.floor(hy)-1)) {
-                hx -= 1/tan;
-                hy--;
-            }
-            distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y),0.5);
-            distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y),0.5);
-            if (distV >= distH) {
-                dist = distH;
-                hitDirection = 0;
-                hitWallType = mapGrid[Math.floor(hy)-1][Math.floor(hx)];
-            } else {
-                dist = distV;
-                hitDirection = 1;
-                hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)-1];
-            }
-        }
-
-        //8 tan<0 x++ y--
-        if (sin < 0 && cos >= 0) {
-            //vertical
-            vx = Math.ceil(x);
-            vy = Math.max(y + tan * (vx - x), 1);
-            while (!checkHit(Math.floor(vx),Math.floor(vy))) {
-                vx++;
-                vy = Math.max(vy + tan, 1);
-            }
-            //horizontal
-            hy = Math.floor(y); //DO NOT REVERSE HY HX!
-            hx = x + (hy - y)/tan;
-            while (!checkHit(Math.floor(hx),Math.floor(hy)-1)) {
-                hx -= 1/tan;
-                hy--;
-            }
-            distV = Math.pow((vx-x)*(vx-x)+(vy-y)*(vy-y),0.5);
-            distH = Math.pow((hx-x)*(hx-x)+(hy-y)*(hy-y),0.5);
-            if (distV >= distH) {
-                dist = distH;
-                hitDirection = 0;
-                hitWallType = mapGrid[Math.floor(hy)-1][Math.floor(hx)];
-            } else {
-                dist = distV;
-                hitDirection = 1;
-                hitWallType = mapGrid[Math.floor(vy)][Math.floor(vx)];
-            }
-        }
-
-        //
-        result.push(dist);
-        result.push(hitDirection);
-        result.push(hitWallType);
-        return result;
-    }
 };
 Game.prototype.drawFrame = function() {
     const
@@ -335,16 +196,16 @@ Game.prototype.drawFrame = function() {
                     const shiftX = Math.min(screenWidth * Math.tan(shiftAlpha), screenWidth);
                     obj.x -= shiftX;
                     obj.playerAlpha = playerAlphaNow;
-                };
+                }
                 if (shiftY) {
                     obj.y += shiftY;
                     obj.accumulatedJumpHeight = state.accumulatedJumpHeight;
-                };
+                }
                 newArray.push(obj);
             }
         });
         state.bulletHitSparks = newArray;
-    }
+    };
     const moveBulletSparks = () => {
         const gravity = CONST.getWindowWidth() * 0.000005;
         state.bulletHitSparks.map((obj) => {
@@ -378,7 +239,7 @@ Game.prototype.drawFrame = function() {
             ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
             ctx.fill();
         })
-    }
+    };
     // bullet sparks: before gun due to layer priority
     if (state.bulletHitSparks.length !== 0) {
         prepareBulletSparksBeforeMove();
