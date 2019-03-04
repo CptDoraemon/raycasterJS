@@ -5,6 +5,7 @@ import { state } from "./state";
 import { Player } from "./player";
 import { serverConnection } from "./serverconnection";
 import { raycaster } from "./tools/raycaster";
+import { remapAngleToZeroToTwoPI } from "./tools/ptopcalc";
 
 function Game() {
     this.mainPlayer = null;
@@ -111,7 +112,7 @@ Game.prototype.drawFrame = function() {
     // }
 // floor
     ctx.beginPath();
-    ctx.fillStyle = 'rgba(150,150,150,1)';
+    ctx.fillStyle = 'rgba(50,50,50,1)';
     ctx.fillRect(0, 0.5 * height, width, 0.5 * height);
     ctx.fill();
 // wall
@@ -130,9 +131,7 @@ Game.prototype.drawFrame = function() {
 
     // otherplayer
     this.otherPlayers.map(otherplayer => {
-        if (otherplayer.isInSight) {
-            this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance, width, height)
-        }
+        this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance, width, height)
     });
 
     // crosshair
@@ -164,43 +163,44 @@ Game.prototype.drawFrame = function() {
         const newArray = [];
         const playerAlphaNow = this.mainPlayer.alpha;
         const screenWidth = CONST.getWindowWidth();
-        state.bulletHitSparks.map((obj) => {
+        const screenHeight = CONST.getWindowHeight();
+        state.bulletHit.sparks.map((obj) => {
             if (now - obj.timeStamp < 500) {
                 const shiftAlpha = playerAlphaNow - obj.playerAlpha;
-                const shiftY = state.accumulatedJumpHeight - obj.accumulatedJumpHeight;
+                const jumpD = state.accumulatedJumpHeight - obj.accumulatedJumpHeight;
+                const shiftY = jumpD / (obj.z * Math.tan(Math.PI / 4.5) * 2) * screenHeight;
                 if (shiftAlpha) {
                     // let shiftX = Math.tan(shiftAlpha) * obj.z; /* shift on map grid */
                     // shiftX =  Math.min(screenWidth * shiftX / obj.z, screenWidth); /* shift on screen */
                     const shiftX = Math.min(screenWidth * Math.tan(shiftAlpha), screenWidth);
-                    obj.x -= shiftX;
+                    obj.screenX -= shiftX;
                     obj.playerAlpha = playerAlphaNow;
                 }
-                if (shiftY) {
-                    obj.y += shiftY;
-                    obj.accumulatedJumpHeight = state.accumulatedJumpHeight;
-                }
+                //
+                obj.screenY += shiftY;
+                obj.accumulatedJumpHeight = state.accumulatedJumpHeight;
                 newArray.push(obj);
             }
         });
-        state.bulletHitSparks = newArray;
+        state.bulletHit.sparks = newArray;
     };
     const moveBulletSparks = () => {
         const gravity = CONST.getWindowWidth() * 0.000005;
-        state.bulletHitSparks.map((obj) => {
+        state.bulletHit.sparks.map((obj) => {
             const gravityToZ = Math.min(gravity, gravity * 2 / obj.z);
             if (obj.type === 'dirt') {
-                obj.x += obj.speedX;
+                obj.screenX += obj.speedX;
                 obj.speedX *= 0.9;
                 obj.speedY += gravityToZ;
-                obj.y += obj.speedY;
+                obj.screenY += obj.speedY;
                 obj.opacity -= 0.003;
                 obj.radius *= 0.99;
             } else if (obj.type === 'spark' || obj.type === 'blood') {
                 // sparks and blood
-                obj.x += obj.speedX;
+                obj.screenX += obj.speedX;
                 obj.speedX *= 0.999;
                 obj.speedY += gravityToZ;
-                obj.y += obj.speedY;
+                obj.screenY += obj.speedY;
                 obj.opacity -= 0.001;
                 obj.radius *= 0.99;
             } else if (obj.type === 'crater') {
@@ -208,18 +208,18 @@ Game.prototype.drawFrame = function() {
             }
         });
 
-        state.bulletHitSparks.map((obj) => {
+        state.bulletHit.sparks.map((obj) => {
             ctx.fillStyle = obj.type === 'spark' ? 'rgba(255,255,0,'+obj.opacity+')' :
                 obj.type === 'blood' ? 'rgba(255,0,0,'+obj.opacity+')' :
                     obj.type === 'dirt' ? 'rgba(50,50,50,'+obj.opacity+')' :
                         'rgba(0,0,0,'+obj.opacity+')';
             ctx.beginPath();
-            ctx.arc(obj.x, obj.y, obj.radius, 0, 2 * Math.PI);
+            ctx.arc(obj.screenX, obj.screenY, obj.radius, 0, 2 * Math.PI);
             ctx.fill();
         })
     };
     // bullet sparks: before gun due to layer priority
-    if (state.bulletHitSparks.length !== 0) {
+    if (state.bulletHit.sparks.length !== 0) {
         prepareBulletSparksBeforeMove();
         for (let i=0; i<10; i++) {
             moveBulletSparks()
@@ -253,10 +253,10 @@ Game.prototype.drawFrame = function() {
         ctx.rotate(-state.muzzelRotate);
         ctx.translate(-muzzleCenterX, -muzzleCenterY);
         // draw crater
-        const radius = Math.min(4, 20 / state.bulletHitZ);
-        ctx.fillStyle = state.bulletHitConfirmed ? 'rgb(255,0,0)' : 'rgb(0,0,0)';
+        const radius = Math.min(4, 20 / state.bulletHit.z);
+        ctx.fillStyle = state.bulletHit.isHitConfirmed ? 'rgb(255,0,0)' : 'rgb(0,0,0)';
         ctx.beginPath();
-        ctx.arc(state.bulletHitX, state.bulletHitY, radius, 0, 2 * Math.PI);
+        ctx.arc(state.bulletHit.screenX, state.bulletHit.screenY, radius, 0, 2 * Math.PI);
         ctx.fill();
     }
     ctx.drawImage(gun, 0, 0, gunWidthSource, gunHeightSource, gunPosStartX, gunPosStartY, gunWidth, gunHeight);
@@ -312,9 +312,9 @@ Game.prototype.drawFrame = function() {
             }
         });
         let mainPlayerFacing = this.mainPlayer.alpha;
-        mainPlayerFacing = CONST.remapAngleToZeroToTwoPI(mainPlayerFacing);
+        mainPlayerFacing = remapAngleToZeroToTwoPI(mainPlayerFacing);
         let diff = mainPlayerFacing - otherPlayerAngleArray[0];
-        diff = CONST.remapAngleToZeroToTwoPI(diff);
+        diff = remapAngleToZeroToTwoPI(diff);
 
         const calcDirection = (diff, fov) => {
             const twoPI = Math.PI * 2;
@@ -332,7 +332,7 @@ Game.prototype.drawFrame = function() {
 
         otherPlayerAngleArray.map(otherPlayerAngle => {
             let diff = mainPlayerFacing - otherPlayerAngle;
-            diff = CONST.remapAngleToZeroToTwoPI(diff);
+            diff = remapAngleToZeroToTwoPI(diff);
             const obj = {
                 direction: calcDirection(diff, this.fov),
                 date: new Date()
@@ -345,6 +345,7 @@ Game.prototype.drawFrame = function() {
     if (this.drawDamageIndicatorArray.length !== 0) {
         ctx.strokeStyle = 'rgba(255,0,0,0.3)';
         ctx.lineWidth = 0.05 * height;
+        let start, end;
         this.drawDamageIndicatorArray.map(obj => {
             const direction = obj.direction;
             const twoPI = Math.PI * 2;
@@ -378,7 +379,7 @@ Game.prototype.updateOtherPlayers = function() {
     const array = [];
     state.playersArray.map(obj => {
         if (obj.playerId !== state.playerId) array.push(obj)
-    })
+    });
     this.otherPlayers = array;
     // clear hit zone
     state.hitZone = [];
@@ -393,8 +394,7 @@ Game.prototype.updateOtherPlayers = function() {
             dy = y2 - y1,
             z = Math.pow(dx*dx + dy*dy, 0.5),
             twoPI = Math.PI * 2,
-            rayAngleArray = this.rayAngleArray.slice(),
-            remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
+            rayAngleArray = this.rayAngleArray.slice();
         let anotherPlayersAngleToMainPlayer;
         // dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
         if (dx === 0 && dy === 0) {
@@ -421,28 +421,6 @@ Game.prototype.updateOtherPlayers = function() {
             anotherPlayersAngleToMainPlayer = twoPI - Math.atan(-dy / dx);
         }
         anotherPlayersAngleToMainPlayer = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer);
-
-        function checkIfAnotherPlayerIsInSight(sightStartAngle, sightEndAngle, fov, anotherPlayersAngleToMainPlayer) {
-            const end = remapAngleToZeroToTwoPI(sightEndAngle);
-            let start = remapAngleToZeroToTwoPI(sightStartAngle);
-            //console.log(start * 360 / Math.PI / 2, end * 360 / Math.PI / 2, anotherPlayersAngleToMainPlayer* 360 / Math.PI / 2)
-            if (end < fov) {
-                if ((start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < Math.PI * 2) || (0 < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end)) {
-                    return true
-                } else {
-                    return false
-                }
-            } else {
-                if (start < anotherPlayersAngleToMainPlayer && anotherPlayersAngleToMainPlayer < end) {
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-        }
-        const isOtherPlayerInSight = checkIfAnotherPlayerIsInSight(rayAngleArray[0], rayAngleArray[rayAngleArray.length - 1], this.fov, anotherPlayersAngleToMainPlayer);
-
-        otherPlayer.isInSight = isOtherPlayerInSight;
         otherPlayer.anotherPlayersAngleToMainPlayer = anotherPlayersAngleToMainPlayer;
         otherPlayer.distance = z;
     };
@@ -453,62 +431,52 @@ Game.prototype.updateOtherPlayers = function() {
     // sort, draw from far to close
     this.otherPlayers.sort((a, b) => b.distance - a.distance);
 };
-Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMainPlayer, z, screenWidth, screenHeight) {
-    const
-        otherPlayerId = otherPlayer.playerId,
-        playerMaxWidth = 0.3 * CONST.getWindowWidth(),
-        playerMaxHeight = playerMaxWidth * (24 / 13.6), /* ratio as per actual image ratio */
-        //distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
-        distance = z,
-        playerCurrentWidth = Math.min((3 * playerMaxWidth / z) * 0.8, playerMaxWidth),
-        playerCurrentHeight = Math.min((3 * playerMaxHeight / z) * 0.8, playerMaxHeight),
-        playerCurrentJumpHeight = Math.min(6 * otherPlayer.accumulatedJumpHeight / z, otherPlayer.accumulatedJumpHeight);
+Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMainPlayer, z) {
+    const diff = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer - this.rayAngleArray[0]);
+    if (0 < diff && diff < this.fov ) {
+        const screenWidth = CONST.getWindowWidth();
+        const screenHeight = CONST.getWindowHeight();
+        const otherPlayerXOnScreen = Math.floor((diff / this.fov) * screenWidth);
+        const array = this.wallArray[Math.max(0, otherPlayerXOnScreen - 1)];
+        const wallDistAtThisPos = array[array.length - 1].distFishEyeCorrected;
 
-    const remapAngleToZeroToTwoPI = CONST.remapAngleToZeroToTwoPI;
-    let start = remapAngleToZeroToTwoPI(this.rayAngleArray[0]);
-
-    if (anotherPlayersAngleToMainPlayer < start) {
-        // this function is called when another player is garanteed in sight
-        anotherPlayersAngleToMainPlayer += Math.PI * 2
-    }
-    const otherPlayerPosOnScreen = Math.floor((anotherPlayersAngleToMainPlayer - start) / this.dAlpha);
-    const wallDistAtThisPos = this.wallDistArrayBeforeFishEyeCorrection[otherPlayerPosOnScreen];
-    if (z < wallDistAtThisPos) {
-        // check if another player is blocked by wall is HERE!!
-        // draw other player if insight
-        const ctx = document.getElementById('mainCanvas').getContext('2d');
-        const soldierEl = document.getElementById('soldier');
-        const
-            drawX = (otherPlayerPosOnScreen * param.resolution - playerCurrentWidth / 2),
-            drawY = 0.5 * (screenHeight - playerCurrentHeight) + 0.2 * playerCurrentHeight + state.accumulatedJumpHeight - playerCurrentJumpHeight,
-            drawWidth = playerCurrentWidth,
-            drawHeight = playerCurrentHeight,
-            hitZoneWidth = (10 / 13.6) * drawWidth; /* ratio as per actual image ratio */
-        //ctx.fillStyle = otherPlayer.isRespawning ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 0, 1)';
-        //ctx.beginPath();
-        //ctx.fillRect(drawX, drawY, drawWidth, drawHeight);
-        //ctx.fill();
-        ctx.globalAlpha = otherPlayer.isRespawning ? 0.5 : 1;
-        ctx.drawImage(soldierEl, 0, 0, soldierEl.width, soldierEl.height, drawX, drawY, drawWidth, drawHeight);
-        // player shadow
-        // const gradient = ctx.createLinearGradient(drawX, drawY, drawX + 200,drawY +200);
-        // gradient.addColorStop(0, 'rgba(0,0,0,0.2)');
-        // gradient.addColorStop(.5, 'rgba(0,0,0,1)');
-        // gradient.addColorStop(1, 'rgba(0,0,0,0.2)');
-        // ctx.fillStyle = gradient;
-        // ctx.beginPath();
-        // ctx.ellipse(drawX + 0.5 * drawWidth, drawY + drawHeight, 0.4 * drawWidth, 0.1 * drawWidth, 0, 0, 2 * Math.PI);
-        // ctx.fill();
-        ctx.globalAlpha = 1;
-        // other player's id
-        const fontSize = Math.min(18, 8 + 20/z);
-        ctx.font = '500 ' + fontSize + 'px Roboto';
-        ctx.fillStyle = "rgb(255, 0, 0)";
-        ctx.textAlign = "center";
-        ctx.fillText(otherPlayerId, drawX + 0.5 * drawWidth, drawY - 10);
-        // update hitZone
-        if (!otherPlayer.isRespawning) {
-            state.hitZone.push([otherPlayerId, drawX, drawY, hitZoneWidth, drawHeight, z]);
+        if (z < wallDistAtThisPos) {
+            const
+                playerActualHeight = 1.5, /* my height is 1, otherplayer in my sight is a bit taller so crosshair won't aim head */
+                jumpHeightOffset = otherPlayer.accumulatedJumpHeight - state.accumulatedJumpHeight,
+                playerActualWidth = playerActualHeight / 24 * 13.6, /* ratio as per actual image ratio */
+                //distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
+                cameraPlaneHeight = z * Math.tan(Math.PI / 4.5) * 2,
+                cameraPlaneWidth = z * Math.tan(Math.PI / 3) * 2,
+                playerDrawStartYPercent = ((1.5 - 1) + jumpHeightOffset) / (cameraPlaneHeight * 0.5),/* zero is top */
+                playerDrawStartYScreen = (1 - playerDrawStartYPercent) * screenHeight * 0.5,
+                playerHeightOnScreen = (playerActualHeight / cameraPlaneHeight) * screenHeight,
+                playerWidthOnScreen = (playerActualWidth / cameraPlaneWidth) * screenWidth;
+            // check if another player is blocked by wall is HERE!!
+            // draw other player if insight
+            const ctx = document.getElementById('mainCanvas').getContext('2d');
+            const soldierEl = document.getElementById('soldier');
+            ctx.globalAlpha = otherPlayer.isRespawning ? 0.5 : 1;
+            ctx.drawImage(soldierEl, 0, 0, soldierEl.width, soldierEl.height, otherPlayerXOnScreen, playerDrawStartYScreen, playerWidthOnScreen, playerHeightOnScreen);
+            ctx.globalAlpha = 1;
+            // other player's id
+            const fontSize = Math.min(18, 8 + 20 / z);
+            ctx.font = '500 ' + fontSize + 'px Roboto';
+            ctx.fillStyle = "rgb(255, 0, 0)";
+            ctx.textAlign = "center";
+            ctx.fillText(otherPlayer.playerId, otherPlayerXOnScreen + 0.5 * playerWidthOnScreen, playerDrawStartYScreen - 10);
+            // update hitZone
+            if (!otherPlayer.isRespawning) {
+                const hitZone = {
+                    playerId: otherPlayer.playerId,
+                    x: otherPlayerXOnScreen,
+                    y: playerDrawStartYScreen,
+                    width: playerWidthOnScreen,
+                    height: playerHeightOnScreen,
+                    z: z
+                };
+                state.hitZone.push(hitZone);
+            }
         }
     }
 };
@@ -553,7 +521,7 @@ Game.prototype.drawMinimap = function() {
     ctx.fill();
     // rays
     this.rayAngleArray.map((i, index) => {
-        const thisRayLength = this.wallArray[index][0].dist;
+        const thisRayLength = this.wallArray[index][this.wallArray[index].length - 1].dist;
         ctx.strokeStyle = "rgba(0,255,0,0.01)";
         ctx.beginPath();
         ctx.moveTo(playerXOnMinimap, playerYOnMinimap);
@@ -672,7 +640,7 @@ Game.prototype.respawnFrame = function() {
             ctx.fillText('HOLD ON', 0.5 * width, 0.5 * height);
         }
     }
-    this.respawnFramethrottler++
+    this.respawnFramethrottler++;
 
 
     //
@@ -687,8 +655,8 @@ Game.prototype.frame = function() {
     this.mainPlayer.move();
     if (state.isConnectedToServer) {
         serverConnection.upLinkUpdatePosition();
-        this.updateOtherPlayers();
     }
+    this.updateOtherPlayers();
     this.ray();
     this.drawFrame();
 

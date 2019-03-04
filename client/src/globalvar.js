@@ -23,11 +23,6 @@ let GlobalVar;
         this.assetsCount = Object.keys(assetsUrlObj).length;
         return assetsUrlObj
     };
-    GlobalVar.prototype.remapAngleToZeroToTwoPI = function(angle) {
-        const twoPI = Math.PI * 2;
-        let a = angle % twoPI;
-        return a > 0 ? a : twoPI + a
-    }
 })();
 
 const CONST = new GlobalVar();

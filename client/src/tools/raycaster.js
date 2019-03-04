@@ -3,7 +3,7 @@ import { param } from "../param";
 function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
     // input origin x,y and angle alpha, return distance.
     //
-    const playerHeight = 2;
+    const playerHeight = 1;
     const halfYFov = Math.PI / 8 * 2; /* 40 deg, 3:2 */
     //
     const
@@ -84,7 +84,7 @@ function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
         }
     });
     hitCoordinateFiltered.sort((a, b) => {
-        return b.dist - a.dist
+        return b.distFishEyeCorrected - a.distFishEyeCorrected
     });
     // calc height
     hitCoordinateFiltered.map((obj) => {

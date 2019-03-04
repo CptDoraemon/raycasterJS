@@ -1,6 +1,5 @@
 import { param } from "./param";
 import { state } from "./state";
-import { serverConnection } from "./serverconnection";
 import { CONST } from "./globalvar";
 import { game } from "./game";
 
@@ -16,7 +15,6 @@ function Player() {
     this.moveSpeed = 0.05;
     this.rotateSpeed = 0.01;
     this.mapGrid = param.getMapGrid();
-    this.totalMagzine = 120;
     // related to jump function
     this.gravity = param.getGravity();
 }
@@ -130,42 +128,46 @@ Player.prototype.move = function() {
             state.currentMagzine--;
             // bullet hit position
             const isMoving = this.forward || this.backward || state.currentJumpVelocity;
-            const recoil = isMoving ? param.recoilMovingMax : param.recoilStaticMax;
+            const recoil = isMoving ? 100 : 10;
             const bulletHitX = CONST.getWindowWidth() * 0.5 + (Math.random() - 0.5) * recoil;
             const bulletHitY = CONST.getWindowHeight() * 0.5 + (Math.random() - 0.5) * recoil;
-            state.bulletHitX = bulletHitX;
-            state.bulletHitY = bulletHitY;
-            state.bulletHitZ = game.wallDistArrayBeforeFishEyeCorrection[Math.floor(bulletHitX)];
-            state.bulletHitConfirmed = false;
+            const wallsOnTrajectory = game.wallArray[Math.floor(bulletHitX / param.resolution)];
+            state.bulletHit.z = wallsOnTrajectory[wallsOnTrajectory.length - 1].distFishEyeCorrected;
+            state.bulletHit.screenX = bulletHitX;
+            state.bulletHit.screenY = bulletHitY - state.accumulatedJumpHeight;
+            state.bulletHit.isHitConfirmed = false;
             // check hit
             if (state.hitZone.length) {
-                state.hitZone.map(i => {
+                state.hitZone.map(obj => {
                     // [otherplayer.playerId, drawX. drawY, drawWidth, drawHeight]
-                    const isHit = (i[1] < bulletHitX) && (bulletHitX < (i[1] + i[3])) && (i[2] < bulletHitY) && (bulletHitY < (i[2] + i[4]));
+                    const isHit = (obj.x < bulletHitX) && (bulletHitX < (obj.x + obj.width)) && (obj.y < bulletHitY) && (bulletHitY < (obj.y + obj.height));
                     if (isHit) {
-                        state.hitPlayerArray.push(i[0]);
-                        state.bulletHitConfirmed = true;
-                        state.bulletHitZ = i[5];
+                        state.hitPlayerArray.push(obj.playerId);
+                        state.bulletHit.isHitConfirmed = true;
+                        state.bulletHit.z = obj.z;
                     }
                 });
             }
             // bullet sparks: create new sparks; move existed is above
             const now = new Date();
             const baseWidth = CONST.getWindowWidth() * 0.01;
-            const baseWidthToZ = Math.min(baseWidth, baseWidth * 2 / state.bulletHitZ);
-            const radius = Math.min(5, 20 / state.bulletHitZ);
-            if (!state.bulletHitConfirmed) {
+            const baseWidthToZ = Math.min(baseWidth, baseWidth * 2 / state.bulletHit.z);
+            const radius = Math.min(5, 20 / state.bulletHit.z);
+            if (!state.bulletHit.isHitConfirmed) {
                 const crater = {
                     type: 'crater',
                     timeStamp: now,
-                    x: state.bulletHitX,
-                    y: state.bulletHitY,
+                    screenX: state.bulletHit.screenX,
+                    screenY: state.bulletHit.screenY,
+                    z: state.bulletHit.z,
                     radius: 0.8 * radius,
                     playerAlpha: this.alpha,
+                    playerX: this.x,
+                    playerY: this.y,
                     opacity: 1,
                     accumulatedJumpHeight: state.accumulatedJumpHeight
                 };
-                state.bulletHitSparks.push(crater);
+                state.bulletHit.sparks.push(crater);
                 for (let i=0; i<5; i++) {
                     let sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.1;
                     let sparkSpeedY = (Math.random() - 0.5) * baseWidthToZ * 0.05;
@@ -174,12 +176,14 @@ Player.prototype.move = function() {
                         speedX: sparkSpeedX,
                         speedY: sparkSpeedY,
                         timeStamp: now,
-                        x: state.bulletHitX,
-                        y: state.bulletHitY,
-                        z: state.bulletHitZ,
+                        screenX: state.bulletHit.screenX,
+                        screenY: state.bulletHit.screenY,
+                        z: state.bulletHit.z,
                         radius: radius * 0.5,
                         opacity: 0.8,
                         playerAlpha: this.alpha,
+                        playerX: this.x,
+                        playerY: this.y,
                         accumulatedJumpHeight: state.accumulatedJumpHeight,
                     };
                     sparkSpeedX = (Math.random() - 0.5) * baseWidthToZ * 0.5;
@@ -189,15 +193,17 @@ Player.prototype.move = function() {
                         speedX: sparkSpeedX,
                         speedY: sparkSpeedY,
                         timeStamp: now,
-                        x: state.bulletHitX,
-                        y: state.bulletHitY,
-                        z: state.bulletHitZ,
+                        screenX: state.bulletHit.screenX,
+                        screenY: state.bulletHit.screenY,
+                        z: state.bulletHit.z,
                         radius: radius,
                         opacity: 1,
                         playerAlpha: this.alpha,
+                        playerX: this.x,
+                        playerY: this.y,
                         accumulatedJumpHeight: state.accumulatedJumpHeight,
                     };
-                    state.bulletHitSparks.push(dirt, spark);
+                    state.bulletHit.sparks.push(dirt, spark);
                 }
             } else {
                 for (let i=0; i<10; i++) {
@@ -208,15 +214,17 @@ Player.prototype.move = function() {
                         speedX: sparkSpeedX,
                         speedY: sparkSpeedY,
                         timeStamp: now,
-                        x: state.bulletHitX,
-                        y: state.bulletHitY,
-                        z: state.bulletHitZ,
+                        screenX: state.bulletHit.screenX,
+                        screenY: state.bulletHit.screenY,
+                        z: state.bulletHit.z,
                         radius: radius,
                         opacity: 1,
                         playerAlpha: this.alpha,
+                        playerX: this.x,
+                        playerY: this.y,
                         accumulatedJumpHeight: state.accumulatedJumpHeight,
                     };
-                    state.bulletHitSparks.push(blood);
+                    state.bulletHit.sparks.push(blood);
                 }
             }
             // update text

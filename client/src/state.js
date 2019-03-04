@@ -24,11 +24,15 @@ function State() {
     this.muzzleRotate = Math.random() * Math.PI * 2;
     this.thisRoundFiringFinished = true;
     //
-    this.bulletHitX;
-    this.bulletHitY;
-    this.bulletHitZ;
-    this.bulletHitConfirmed; /* used to change crater color */
-    this.bulletHitSparks = [];
+    this.bulletHit = {
+        x: 0,
+        y: 0,
+        z: 0,
+        screenX: 0,
+        screenY: 0,
+        isHitConfirmed: false,
+        sparks: []
+    };
     //
     this.canvasCenterTextOpacity = 1;
     this.canvasCenterTextOpacitySign = -1;
@@ -44,7 +48,7 @@ function State() {
     this.serverMessage = [];
     this.serverMessageTimeout = null;
     // _id for this player
-    this.playerId;
+    this.playerId = null;
     //
     this.latency = 0;
     this.isDisplayingLatency = true;
