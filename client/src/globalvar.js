@@ -7,7 +7,7 @@ let GlobalVar;
         width = window.innerWidth,
         height = window.innerHeight,
         assetsUrlObj = {
-            sky: './assets/sky.jpg',
+            // sky: './assets/sky.jpg',
             gun: './assets/gun.png',
             muzzle: './assets/muzzle.png',
             emptyBullet: './assets/bullet.png',

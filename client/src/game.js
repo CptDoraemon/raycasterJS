@@ -87,16 +87,16 @@ Game.prototype.drawFrame = function() {
 // resolution
     param.resolution = state.isLowerGraphicQuality ? param.resolutionLow : param.resolutionHigh;
 // sky
-    const
-        sky = document.getElementById("sky"),
-        skyWidth = sky.width,
-        skyHeight = sky.height,
-        playerAlpha =  this.mainPlayer.alpha,
-        twoPI = Math.PI * 2,
-        cameraAngle = playerAlpha % twoPI,
-        direction = cameraAngle > 0 ?
-            cameraAngle / twoPI :
-            (twoPI + cameraAngle) / twoPI;
+//     const
+        // sky = document.getElementById("sky"),
+        // skyWidth = sky.width,
+        // skyHeight = sky.height,
+        // playerAlpha =  this.mainPlayer.alpha,
+        // twoPI = Math.PI * 2,
+        // cameraAngle = playerAlpha % twoPI,
+        // direction = cameraAngle > 0 ?
+        //     cameraAngle / twoPI :
+        //     (twoPI + cameraAngle) / twoPI;
     ctx.beginPath();
     ctx.fillStyle = 'rgb(0, 172, 237)';
     ctx.fillRect(0, 0, width, 0.5 * height);
@@ -433,14 +433,15 @@ Game.prototype.updateOtherPlayers = function() {
 };
 Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMainPlayer, z) {
     const diff = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer - this.rayAngleArray[0]);
-    if (0 < diff && diff < this.fov ) {
+    if (0 < diff && diff < this.fov) {
         const screenWidth = CONST.getWindowWidth();
         const screenHeight = CONST.getWindowHeight();
         const otherPlayerXOnScreen = Math.floor((diff / this.fov) * screenWidth);
-        const array = this.wallArray[Math.max(0, otherPlayerXOnScreen - 1)];
-        const wallDistAtThisPos = array[array.length - 1].distFishEyeCorrected;
+        const index = Math.floor((diff / this.fov) * this.wallArray.length);
+        const array = this.wallArray[index];
+        const wallDistAtThisPos = array[array.length - 1].dist;
 
-        if (z < wallDistAtThisPos) {
+        if (z <= wallDistAtThisPos) {
             const
                 playerActualHeight = 1.5, /* my height is 1, otherplayer in my sight is a bit taller so crosshair won't aim head */
                 jumpHeightOffset = otherPlayer.accumulatedJumpHeight - state.accumulatedJumpHeight,
@@ -653,6 +654,7 @@ Game.prototype.respawnFrame = function() {
 };
 Game.prototype.frame = function() {
     this.mainPlayer.move();
+    console.log(this.mainPlayer.x, this.mainPlayer.y);
     if (state.isConnectedToServer) {
         serverConnection.upLinkUpdatePosition();
     }
