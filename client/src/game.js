@@ -654,7 +654,6 @@ Game.prototype.respawnFrame = function() {
 };
 Game.prototype.frame = function() {
     this.mainPlayer.move();
-    console.log(this.mainPlayer.x, this.mainPlayer.y);
     if (state.isConnectedToServer) {
         serverConnection.upLinkUpdatePosition();
     }
