@@ -120,35 +120,40 @@ Game.prototype.drawFrame = function() {
             const
                 resolution = param.resolution,
                 wallStart = obj.wallStartYOnScreenPercent * height,
-                wallEnd = obj.wallEndYOnScreenPercent * height;
-            ctx.fillStyle = obj.hitDirection === 0 ? param.getWallTypeInfo()[obj.hitWallType].color : param.getWallTypeInfo()[obj.hitWallType].shade;
-            ctx.beginPath();
-            ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
-            ctx.fill();
-            // const
-            //     brickWall = document.getElementById('greyWall'),
-            //     offset = obj.hitDirection === 0 ? obj.x - Math.floor(obj.x) : obj.y - Math.floor(obj.y),
-            //     sourceX = offset * brickWall.width,
-            //     sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * brickWall.width,
-            //     sourceWidth = sourceX + sourceWidthInOneColumn > brickWall.width ? brickWall.width - sourceX : sourceWidthInOneColumn;
-            //
-            // ctx.drawImage(
-            //     brickWall,
-            //     sourceX,
-            //     obj.textureYOffset * brickWall.height,
-            //     sourceWidth,
-            //     (1 - obj.textureYOffset) * brickWall.height,
-            //     index * resolution,
-            //     wallStart,
-            //     resolution,
-            //     wallEnd - wallStart);
-            // // shade
-            // if (obj.hitDirection === 1) {
-            //     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            //     ctx.beginPath();
-            //     ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
-            //     ctx.fill();
-            // }
+                wallEnd = obj.wallEndYOnScreenPercent * height,
+                wallInfo = param.getWallTypeInfo()[obj.hitWallType];
+            if (!state.isTextured) {
+                ctx.fillStyle = obj.hitDirection === 0 ? wallInfo.color : wallInfo.shade;
+                ctx.beginPath();
+                ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
+                ctx.fill();
+            } else {
+                const
+                    texture = document.getElementById(wallInfo.texture),
+                    offset = obj.hitDirection === 0 ? obj.x - Math.floor(obj.x) : obj.y - Math.floor(obj.y),
+                    sourceX = offset * brickWall.width,
+                    sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * brickWall.width,
+                    sourceWidth = sourceX + sourceWidthInOneColumn > brickWall.width ? brickWall.width - sourceX : sourceWidthInOneColumn;
+                if (wallInfo.texture) {
+                    ctx.drawImage(
+                        texture,
+                        sourceX,
+                        obj.textureYOffset * brickWall.height,
+                        sourceWidth,
+                        (1 - obj.textureYOffset) * brickWall.height,
+                        index * resolution,
+                        wallStart,
+                        resolution,
+                        wallEnd - wallStart);
+                }
+                // shade
+                if (obj.hitDirection === 1) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.beginPath();
+                    ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
+                    ctx.fill();
+                }
+            }
         });
     });
 
@@ -317,12 +322,28 @@ Game.prototype.drawFrame = function() {
     if (state.isShowingNoAmmoText) {
         flasingText('RAN OUT OF AMMO')
     }
-    // latency text
+    // latency
     if (state.isDisplayingLatency) {
         ctx.font = "300 10px Roboto";
         ctx.fillStyle = "rgb(0, 0, 0)";
         ctx.textAlign = "right";
         ctx.fillText('ping: ' + state.latency + ' ms', width, 10);
+    }
+    // fps
+    if (state.isDisplayingFps) {
+        ctx.font = "300 10px Roboto";
+        ctx.fillStyle = "rgb(0, 0, 0)";
+        ctx.textAlign = "right";
+        state.frameCount++;
+        const
+            now = new Date(),
+            timeDiff = now - state.fpsTimeStamp;
+        if (timeDiff >= 1000) {
+            state.fps = (1000 * state.frameCount / timeDiff).toFixed(2);
+            state.frameCount = 0;
+            state.fpsTimeStamp = now;
+        }
+        ctx.fillText('fps: ' + state.fps, width - 50, 10);
     }
     // damage indicator
     if(state.damageIndicator.length !== 0) {

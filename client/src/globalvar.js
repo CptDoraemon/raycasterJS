@@ -8,6 +8,8 @@ let GlobalVar;
         height = window.innerHeight,
         assetsUrlObj = {
             // sky: './assets/sky.jpg',
+            whiteWall: './assets/whitewall.jpg',
+            brickWall: './assets/brickwall.jpg',
             gun: './assets/gun.png',
             muzzle: './assets/muzzle.png',
             emptyBullet: './assets/bullet.png',

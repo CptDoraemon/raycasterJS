@@ -64,13 +64,13 @@ function ToolBarComponent() {
         const item = createDiv('settingDropdownItem' + number);
         item.className = 'settingDropdownItem';
         const onHandler = () => {
-            item.innerHTML = '<span>' + text + ' <i class="fas fa-toggle-on" style="color: green; font-size: 24px; top: .125em; position: relative""></i></span>';
+            item.innerHTML = '<span>' + text + '<i class="fas fa-toggle-on" style="color: green; font-size: 24px; top: .125em; position: relative"></i></span>';
             state[statePropertyString] = true;
         };
         const offHandler = () => {
-            item.innerHTML = '<span>' + text + ' <i class="fas fa-toggle-off" style="color: rgba(0,0,0,0.5); font-size: 24px; top: .125em; position: relative"></i></span>';
+            item.innerHTML = '<span>' + text + '<i class="fas fa-toggle-off" style="color: rgba(0,0,0,0.5); font-size: 24px; top: .125em; position: relative"></i></span>';
             state[statePropertyString] = false;
-        }
+        };
         initiateIsON ? onHandler() : offHandler();
         item.onclick = (e) => {
             e.stopPropagation();
@@ -83,8 +83,10 @@ function ToolBarComponent() {
         info = createDiv('info'),
         setting = createDiv('setting'),
         settingDropdown = createDiv('settingDropdown');
-    createSettingItem(settingItems, 'Lower graphic quality', 'isLowerGraphicQuality', false);
-    createSettingItem(settingItems, 'Display latency', 'isDisplayingLatency', true);
+    createSettingItem(settingItems, 'Lower Graphic Quality', 'isLowerGraphicQuality', false);
+    createSettingItem(settingItems, 'Display Latency', 'isDisplayingLatency', true);
+    createSettingItem(settingItems, 'Display Fps', 'isDisplayingFps', true);
+    createSettingItem(settingItems, 'Textured Wall', 'isTextured', false);
     info.innerHTML = '<span><i class="fas fa-info-circle"></i></span>';
     setting.innerHTML = '<span><i class="fas fa-cog"></i></span>';
 
@@ -117,7 +119,7 @@ ToolBarComponent.prototype.closeSettingDropdown = function() {
     if (this.isSettingDropdownActive) {
         const dropdown = this.settingDropdownComponent;
         dropdown.style.opacity = 0;
-        dropdown.style.visibility = 'hidden'
+        dropdown.style.visibility = 'hidden';
         this.isSettingDropdownActive = false;
     }
 };
@@ -125,7 +127,7 @@ ToolBarComponent.prototype.openSettingDropdown = function() {
     if (!this.isSettingDropdownActive) {
         const dropdown = this.settingDropdownComponent;
         dropdown.style.opacity = 1;
-        dropdown.style.visibility = 'visible'
+        dropdown.style.visibility = 'visible';
         this.isSettingDropdownActive = true;
     }
 };

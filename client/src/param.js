@@ -70,64 +70,73 @@ let Param;
             order: '1',
             description: 'border',
             height: 3,
-            color: 'rgb(75,43,24)',
-            shade: 'rgb(139,79,45)'
+            color: 'rgb(139,79,45)',
+            shade: 'rgb(75,43,24)',
+            texture: 'whiteWall'
         },
         {
             order: '2',
             description: 'bridge',
             height: 3,
             color:'rgb(255,255,255)',
-            shade:'rgb(200,200,200)'
+            shade:'rgb(200,200,200)',
+            texture: 'whiteWall'
         },
         {
             order: '3',
             description: 'CT building',
             height: 6,
             color: 'rgb(150, 150, 150)',
-            shade: 'rgb(100, 100, 100)'
+            shade: 'rgb(100, 100, 100)',
+            texture: 'whiteWall'
         },
         {
             order: '4',
             description: 'mid building',
             height: 7,
             color: 'rgb(121, 55, 39)',
-            shade: 'rgb(140, 71, 54)'
+            shade: 'rgb(140, 71, 54)',
+            texture: 'brickWall'
         },
         {
             order: '5',
             description: 'warehouse wall',
             height: 6,
             color: 'rgb(180, 180, 180)',
-            shade: 'rgb(120, 120, 120)'
+            shade: 'rgb(120, 120, 120)',
+            texture: 'whiteWall'
         },
         {
             order: '6',
             description: 'red container',
             height: 4,
             color: 'rgb(197, 79, 60)',
-            shade: 'rgb(127, 52, 40)'
+            shade: 'rgb(127, 52, 40)',
+            texture: 'brickWall'
         },
         {
             order: '7',
             description: 'blue container',
             height: 4,
             color: 'rgb(54, 107, 191)',
-            shade: 'rgb(36, 71, 127)'
+            shade: 'rgb(36, 71, 127)',
+            texture: 'brickWall'
         },
         {
             order: '8',
             description: 'greenish small box',
             height: 2,
             color: 'rgb(70, 191, 91)',
-            shade: 'rgb(46, 127, 60)'
+            shade: 'rgb(46, 127, 60)',
+            texture: 'brickWall'
         },
         {
             order: '9',
             description: 'jeep',
             height: 3,
             color: 'rgb(112, 130, 56)',
-            shade: 'rgb(138, 154, 91)'
+            shade: 'rgb(138, 154, 91)',
+            texture: 'brickWall'
         },
     ];
 

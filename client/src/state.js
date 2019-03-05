@@ -49,10 +49,15 @@ function State() {
     this.serverMessageTimeout = null;
     // _id for this player
     this.playerId = null;
-    //
+    // settings
     this.latency = 0;
+    this.frameCount = 0;
+    this.fps = 0;
+    this.fpsTimeStamp = null;
     this.isDisplayingLatency = true;
+    this.isDisplayingFps = true;
     this.isLowerGraphicQuality = false;
+    this.isTextured = false;
     //
     this.playersArray = [];
     //
