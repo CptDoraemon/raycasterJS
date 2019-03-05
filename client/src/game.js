@@ -134,7 +134,6 @@ Game.prototype.drawFrame = function() {
                     sourceX = offset * brickWall.width,
                     sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * brickWall.width,
                     sourceWidth = sourceX + sourceWidthInOneColumn > brickWall.width ? brickWall.width - sourceX : sourceWidthInOneColumn;
-                if (wallInfo.texture) {
                     ctx.drawImage(
                         texture,
                         sourceX,
@@ -145,7 +144,6 @@ Game.prototype.drawFrame = function() {
                         wallStart,
                         resolution,
                         wallEnd - wallStart);
-                }
                 // shade
                 if (obj.hitDirection === 1) {
                     ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -327,7 +325,7 @@ Game.prototype.drawFrame = function() {
         ctx.font = "300 10px Roboto";
         ctx.fillStyle = "rgb(0, 0, 0)";
         ctx.textAlign = "right";
-        ctx.fillText('ping: ' + state.latency + ' ms', width, 10);
+        ctx.fillText('ping: ' + state.latency + ' ms', width - 10, 10);
     }
     // fps
     if (state.isDisplayingFps) {
@@ -343,7 +341,7 @@ Game.prototype.drawFrame = function() {
             state.frameCount = 0;
             state.fpsTimeStamp = now;
         }
-        ctx.fillText('fps: ' + state.fps, width - 50, 10);
+        ctx.fillText('fps: ' + state.fps, width - 10, 25);
     }
     // damage indicator
     if(state.damageIndicator.length !== 0) {
