@@ -13,7 +13,6 @@ function Game() {
     //
     this.wallArray = [];
     this.rayAngleArray = [];
-    this.fov = Math.PI / 3; //60 degree
     this.dAlpha = null; /* angle between rays */
     //
     this.drawDamageIndicatorArray = [];
@@ -63,9 +62,9 @@ Game.prototype.ray = function() {
         wallArray = [],
         width = CONST.getWindowWidth(),
         resolution = param.resolution,
-        dAlpha = (this.fov / (width / resolution));
+        dAlpha = (param.fovX / (width / resolution));
     this.dAlpha = dAlpha;
-    let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * this.fov;
+    let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * param.fovX;
     //
     for (let i = 0; i < width; i += resolution) {
         rayAngleArray.push(rayAngle += dAlpha);
@@ -126,6 +125,30 @@ Game.prototype.drawFrame = function() {
             ctx.beginPath();
             ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
             ctx.fill();
+            // const
+            //     brickWall = document.getElementById('greyWall'),
+            //     offset = obj.hitDirection === 0 ? obj.x - Math.floor(obj.x) : obj.y - Math.floor(obj.y),
+            //     sourceX = offset * brickWall.width,
+            //     sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * brickWall.width,
+            //     sourceWidth = sourceX + sourceWidthInOneColumn > brickWall.width ? brickWall.width - sourceX : sourceWidthInOneColumn;
+            //
+            // ctx.drawImage(
+            //     brickWall,
+            //     sourceX,
+            //     obj.textureYOffset * brickWall.height,
+            //     sourceWidth,
+            //     (1 - obj.textureYOffset) * brickWall.height,
+            //     index * resolution,
+            //     wallStart,
+            //     resolution,
+            //     wallEnd - wallStart);
+            // // shade
+            // if (obj.hitDirection === 1) {
+            //     ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            //     ctx.beginPath();
+            //     ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
+            //     ctx.fill();
+            // }
         });
     });
 
@@ -168,7 +191,7 @@ Game.prototype.drawFrame = function() {
             if (now - obj.timeStamp < 500) {
                 const shiftAlpha = playerAlphaNow - obj.playerAlpha;
                 const jumpD = state.accumulatedJumpHeight - obj.accumulatedJumpHeight;
-                const shiftY = jumpD / (obj.z * Math.tan(Math.PI / 4.5) * 2) * screenHeight;
+                const shiftY = jumpD / (obj.z * Math.tan(param.fovY * 0.5) * 2) * screenHeight;
                 if (shiftAlpha) {
                     // let shiftX = Math.tan(shiftAlpha) * obj.z; /* shift on map grid */
                     // shiftX =  Math.min(screenWidth * shiftX / obj.z, screenWidth); /* shift on screen */
@@ -334,7 +357,7 @@ Game.prototype.drawFrame = function() {
             let diff = mainPlayerFacing - otherPlayerAngle;
             diff = remapAngleToZeroToTwoPI(diff);
             const obj = {
-                direction: calcDirection(diff, this.fov),
+                direction: calcDirection(diff, param.fovX),
                 date: new Date()
             };
             this.drawDamageIndicatorArray.push(obj)
@@ -433,11 +456,11 @@ Game.prototype.updateOtherPlayers = function() {
 };
 Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMainPlayer, z) {
     const diff = remapAngleToZeroToTwoPI(anotherPlayersAngleToMainPlayer - this.rayAngleArray[0]);
-    if (0 < diff && diff < this.fov) {
+    if (0 < diff && diff < param.fovX) {
         const screenWidth = CONST.getWindowWidth();
         const screenHeight = CONST.getWindowHeight();
-        const otherPlayerXOnScreen = Math.floor((diff / this.fov) * screenWidth);
-        const index = Math.floor((diff / this.fov) * this.wallArray.length);
+        const otherPlayerXOnScreen = Math.floor((diff / param.fovX) * screenWidth);
+        const index = Math.floor((diff / param.fovX) * this.wallArray.length);
         const array = this.wallArray[index];
         const wallDistAtThisPos = array[array.length - 1].dist;
 
@@ -447,8 +470,8 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
                 jumpHeightOffset = otherPlayer.accumulatedJumpHeight - state.accumulatedJumpHeight,
                 playerActualWidth = playerActualHeight / 24 * 13.6, /* ratio as per actual image ratio */
                 //distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
-                cameraPlaneHeight = z * Math.tan(Math.PI / 4.5) * 2,
-                cameraPlaneWidth = z * Math.tan(Math.PI / 3) * 2,
+                cameraPlaneHeight = z * Math.tan(param.nonDistortionFovY * 0.5) * 2,
+                cameraPlaneWidth = z * Math.tan(param.fovX * 0.5) * 2,
                 playerDrawStartYPercent = ((1.5 - 1) + jumpHeightOffset) / (cameraPlaneHeight * 0.5),/* zero is top */
                 playerDrawStartYScreen = (1 - playerDrawStartYPercent) * screenHeight * 0.5,
                 playerHeightOnScreen = (playerActualHeight / cameraPlaneHeight) * screenHeight,

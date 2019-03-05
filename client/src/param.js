@@ -14,6 +14,11 @@ let Param;
         //
         this.gunPositionOffsetMax = 10;
         this.gunPositionFiringOffsetMax = 30;
+        //
+        this.fovX = Math.PI / 3;
+        this.nonDistortionFovY = this.fovX / CONST.getWindowWidth() * CONST.getWindowHeight();
+        this.fovY = Math.PI / 3;
+        this.tilt = this.fovY * 0.2;
     };
     const mapGrid =
         [	// 40 * 40, T left wall x is 23
@@ -64,49 +69,49 @@ let Param;
         {
             order: '1',
             description: 'border',
-            height: 5,
+            height: 3,
             color: 'rgb(75,43,24)',
             shade: 'rgb(139,79,45)'
         },
         {
             order: '2',
             description: 'bridge',
-            height: 5,
+            height: 3,
             color:'rgb(255,255,255)',
             shade:'rgb(200,200,200)'
         },
         {
             order: '3',
             description: 'CT building',
-            height: 10,
+            height: 6,
             color: 'rgb(150, 150, 150)',
             shade: 'rgb(100, 100, 100)'
         },
         {
             order: '4',
             description: 'mid building',
-            height: 15,
+            height: 7,
             color: 'rgb(121, 55, 39)',
             shade: 'rgb(140, 71, 54)'
         },
         {
             order: '5',
             description: 'warehouse wall',
-            height: 10,
+            height: 6,
             color: 'rgb(180, 180, 180)',
             shade: 'rgb(120, 120, 120)'
         },
         {
             order: '6',
             description: 'red container',
-            height: 6,
+            height: 4,
             color: 'rgb(197, 79, 60)',
             shade: 'rgb(127, 52, 40)'
         },
         {
             order: '7',
             description: 'blue container',
-            height: 6,
+            height: 4,
             color: 'rgb(54, 107, 191)',
             shade: 'rgb(36, 71, 127)'
         },

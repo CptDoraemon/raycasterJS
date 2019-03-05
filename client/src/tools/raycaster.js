@@ -4,7 +4,7 @@ function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
     // input origin x,y and angle alpha, return distance.
     //
     const playerHeight = 1;
-    const halfYFov = Math.PI / 8 * 2; /* 40 deg, 3:2 */
+    const halfYFov = 0.5 * param.fovY;
     //
     const
         mapWidth = param.getMapGrid()[0].length,
@@ -88,11 +88,13 @@ function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
     });
     // calc height
     hitCoordinateFiltered.map((obj) => {
-        // 45 deg
-        const sightHeightAboveHorizon = playerHeight + accumulatedJumpHeight + obj.distFishEyeCorrected * Math.tan(halfYFov);
-        const sightHeight = 2 * obj.distFishEyeCorrected * Math.tan(halfYFov);
-        obj.wallStartYOnScreenPercent = Math.max(0, sightHeightAboveHorizon - param.getWallTypeInfo()[obj.wallType].height) / sightHeight;
+        const
+            sightHeightAboveHorizon = playerHeight + accumulatedJumpHeight + obj.distFishEyeCorrected * Math.tan(halfYFov),
+            sightHeight = 2 * obj.distFishEyeCorrected * Math.tan(halfYFov),
+            wallHeight = param.getWallTypeInfo()[obj.wallType].height;
+        obj.wallStartYOnScreenPercent = Math.max(0, sightHeightAboveHorizon - wallHeight) / sightHeight;
         obj.wallEndYOnScreenPercent = sightHeightAboveHorizon / sightHeight;
+        obj.textureYOffset = Math.max(0, wallHeight - sightHeightAboveHorizon) / wallHeight;
     });
     return hitCoordinateFiltered;
 }
