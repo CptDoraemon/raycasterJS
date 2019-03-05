@@ -154,7 +154,7 @@ Game.prototype.drawFrame = function() {
 
     // otherplayer
     this.otherPlayers.map(otherplayer => {
-        this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance, width, height)
+        this.drawOtherPlayers(otherplayer, otherplayer.anotherPlayersAngleToMainPlayer, otherplayer.distance)
     });
 
     // crosshair
@@ -469,9 +469,10 @@ Game.prototype.drawOtherPlayers = function(otherPlayer, anotherPlayersAngleToMai
                 playerActualHeight = 1.5, /* my height is 1, otherplayer in my sight is a bit taller so crosshair won't aim head */
                 jumpHeightOffset = otherPlayer.accumulatedJumpHeight - state.accumulatedJumpHeight,
                 playerActualWidth = playerActualHeight / 24 * 13.6, /* ratio as per actual image ratio */
+                //zCorrected = z * Math.cos(anotherPlayersAngleToMainPlayer - this.mainPlayer.alpha - Math.PI * 0.5),
                 //distance = z * Math.cos(anotherPlayersAngleToMainPlayer),
-                cameraPlaneHeight = z * Math.tan(param.nonDistortionFovY * 0.5) * 2,
-                cameraPlaneWidth = z * Math.tan(param.fovX * 0.5) * 2,
+                cameraPlaneHeight = z * Math.tan(param.fovY * 0.5) * 2,
+                cameraPlaneWidth = z * Math.tan(param.nonDistortionFovX / 1.2  * 0.5) * 2,
                 playerDrawStartYPercent = ((1.5 - 1) + jumpHeightOffset) / (cameraPlaneHeight * 0.5),/* zero is top */
                 playerDrawStartYScreen = (1 - playerDrawStartYPercent) * screenHeight * 0.5,
                 playerHeightOnScreen = (playerActualHeight / cameraPlaneHeight) * screenHeight,

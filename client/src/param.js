@@ -16,8 +16,8 @@ let Param;
         this.gunPositionFiringOffsetMax = 30;
         //
         this.fovX = Math.PI / 3;
-        this.nonDistortionFovY = this.fovX / CONST.getWindowWidth() * CONST.getWindowHeight();
         this.fovY = Math.PI / 3;
+        this.nonDistortionFovX = this.fovY / CONST.getWindowHeight() * CONST.getWindowWidth();
         this.tilt = this.fovY * 0.2;
     };
     const mapGrid =
