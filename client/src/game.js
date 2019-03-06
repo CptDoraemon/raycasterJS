@@ -13,7 +13,7 @@ function Game() {
     //
     this.wallArray = [];
     this.rayAngleArray = [];
-    this.dAlpha = null; /* angle between rays */
+    this.dAlpha = param.fovX / (CONST.getWindowWidth() / param.resolution);
     //
     this.drawDamageIndicatorArray = [];
     //
@@ -58,24 +58,22 @@ Game.prototype.createMainPlayer = function() {
 Game.prototype.ray = function() {
     //Prepare rayArray
     const
-        rayAngleArray = [],
-        wallArray = [],
         width = CONST.getWindowWidth(),
         resolution = param.resolution,
-        dAlpha = (param.fovX / (width / resolution));
-    this.dAlpha = dAlpha;
-    let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * param.fovX;
-    //
-    for (let i = 0; i < width; i += resolution) {
-        rayAngleArray.push(rayAngle += dAlpha);
+        columnCount = width / resolution;
+
+    // resolution changed
+    if (this.rayAngleArray.length !== Math.ceil(columnCount)) {
+        this.rayAngleArray.length = 0;
+        this.wallArray.length = 0;
+        this.dAlpha = param.fovX / (width / resolution);
     }
-    this.rayAngleArray = rayAngleArray;
     //
-    rayAngleArray.map((i, index) => {
-        const result = raycaster(this.mainPlayer.x, this.mainPlayer.y, rayAngleArray[index], this.mainPlayer.alpha, state.accumulatedJumpHeight);
-        wallArray.push(result);
-    });
-    this.wallArray = wallArray;
+    let rayAngle /* init first ray */ = this.mainPlayer.alpha - 0.5 * param.fovX;
+    for (let i=0; i<columnCount; i++) {
+        this.rayAngleArray[i] = rayAngle += this.dAlpha;
+        this.wallArray[i] = raycaster(this.mainPlayer.x, this.mainPlayer.y, this.rayAngleArray[i], this.mainPlayer.alpha, state.accumulatedJumpHeight);
+    }
 };
 Game.prototype.drawFrame = function() {
     const
@@ -123,6 +121,7 @@ Game.prototype.drawFrame = function() {
             if (!state.isTextured) {
                 ctx.fillStyle = obj.hitDirection === 0 ? wallInfo.color : wallInfo.shade;
                 ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
+
             } else {
                 const
                     texture = document.getElementById(wallInfo.texture),
