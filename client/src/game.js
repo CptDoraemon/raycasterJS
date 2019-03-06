@@ -96,10 +96,8 @@ Game.prototype.drawFrame = function() {
         // direction = cameraAngle > 0 ?
         //     cameraAngle / twoPI :
         //     (twoPI + cameraAngle) / twoPI;
-    ctx.beginPath();
     ctx.fillStyle = 'rgb(0, 172, 237)';
     ctx.fillRect(0, 0, width, 0.5 * height);
-    ctx.fill();
     // if (5/6*twoPI <= direction && direction <= twoPI) {
     //     const overlay = direction - 5/6*twoPI;
     //     ctx.drawImage(sky, direction*skyWidth, 0, skyWidth, skyHeight, 0, 0, width, 0.6*height);
@@ -110,36 +108,34 @@ Game.prototype.drawFrame = function() {
     //     ctx.drawImage(sky, 0, 0, 0.25*skyWidth, skyHeight, (1-direction)/0.25*width, 0, width, 0.6*height);
     // }
 // floor
-    ctx.beginPath();
     ctx.fillStyle = 'rgba(50,50,50,1)';
     ctx.fillRect(0, 0.5 * height, width, 0.5 * height);
-    ctx.fill();
 // wall
+    const
+        resolution = param.resolution,
+        wallInfoArray = param.getWallTypeInfo();
     this.wallArray.map((arr, index) => {
         arr.map(obj => {
             const
-                resolution = param.resolution,
                 wallStart = obj.wallStartYOnScreenPercent * height,
                 wallEnd = obj.wallEndYOnScreenPercent * height,
-                wallInfo = param.getWallTypeInfo()[obj.hitWallType];
+                wallInfo = wallInfoArray[obj.hitWallType];
             if (!state.isTextured) {
                 ctx.fillStyle = obj.hitDirection === 0 ? wallInfo.color : wallInfo.shade;
-                ctx.beginPath();
                 ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
-                ctx.fill();
             } else {
                 const
                     texture = document.getElementById(wallInfo.texture),
                     offset = obj.hitDirection === 0 ? obj.x - Math.floor(obj.x) : obj.y - Math.floor(obj.y),
-                    sourceX = offset * brickWall.width,
-                    sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * brickWall.width,
-                    sourceWidth = sourceX + sourceWidthInOneColumn > brickWall.width ? brickWall.width - sourceX : sourceWidthInOneColumn;
+                    sourceX = offset * texture.width,
+                    sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * texture.width,
+                    sourceWidth = sourceX + sourceWidthInOneColumn > texture.width ? texture.width - sourceX : sourceWidthInOneColumn;
                     ctx.drawImage(
                         texture,
                         sourceX,
-                        obj.textureYOffset * brickWall.height,
+                        obj.textureYOffset * texture.height,
                         sourceWidth,
-                        (1 - obj.textureYOffset) * brickWall.height,
+                        (1 - obj.textureYOffset) * texture.height,
                         index * resolution,
                         wallStart,
                         resolution,
@@ -147,9 +143,7 @@ Game.prototype.drawFrame = function() {
                 // shade
                 if (obj.hitDirection === 1) {
                     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                    ctx.beginPath();
                     ctx.fillRect(index * resolution, wallStart, resolution, wallEnd - wallStart);
-                    ctx.fill();
                 }
             }
         });
@@ -168,16 +162,13 @@ Game.prototype.drawFrame = function() {
     ctx.beginPath();
     ctx.moveTo(0.5*width-20-crosshairSize,0.5*height);
     ctx.lineTo(0.5*width-5-crosshairSize,0.5*height);
-    ctx.stroke();
-    ctx.beginPath();
+
     ctx.moveTo(0.5*width+5+crosshairSize,0.5*height);
     ctx.lineTo(0.5*width+20+crosshairSize,0.5*height);
-    ctx.stroke();
-    ctx.beginPath();
+
     ctx.moveTo(0.5*width,0.5*height-20-crosshairSize);
     ctx.lineTo(0.5*width,0.5*height-5-crosshairSize);
-    ctx.stroke();
-    ctx.beginPath();
+
     ctx.moveTo(0.5*width,0.5*height+5+crosshairSize);
     ctx.lineTo(0.5*width,0.5*height+20+crosshairSize);
     ctx.stroke();
@@ -435,8 +426,7 @@ Game.prototype.updateOtherPlayers = function() {
             dx = x2 - x1,
             dy = y2 - y1,
             z = Math.pow(dx*dx + dy*dy, 0.5),
-            twoPI = Math.PI * 2,
-            rayAngleArray = this.rayAngleArray.slice();
+            twoPI = Math.PI * 2;
         let anotherPlayersAngleToMainPlayer;
         // dy is reversed in canvas cordinate, and our 0 deg is x-positive !!
         if (dx === 0 && dy === 0) {
@@ -550,10 +540,10 @@ Game.prototype.drawMinimap = function() {
     }
 
     // wall
+    ctx.fillStyle = "rgba(255,255,0,0.5)";
     for (let y=0; y<mapGridSize; y++) {
         for (let x=0; x<mapGridSize; x++){
             if (mapGrid[y][x]) {
-                ctx.fillStyle = "rgba(0,150,0,0.5)";
                 ctx.fillRect(x * pixel + miniMapMargin, y * pixel + miniMapMargin, pixel, pixel);
             }
         }
@@ -564,14 +554,17 @@ Game.prototype.drawMinimap = function() {
     ctx.arc(playerXOnMinimap, playerYOnMinimap, miniMapSize / 100, 0 , 2 * Math.PI);
     ctx.fill();
     // rays
-    this.rayAngleArray.map((i, index) => {
-        const thisRayLength = this.wallArray[index][this.wallArray[index].length - 1].dist;
-        ctx.strokeStyle = "rgba(0,255,0,0.01)";
-        ctx.beginPath();
+    const wallArray = this.wallArray;
+    const rayAngleArray = this.rayAngleArray;
+    ctx.strokeStyle = "rgba(255,255,0,0.3)";
+    ctx.beginPath();
+    for (let i=0; i< rayAngleArray.length; i+=20) {
+        const thisRayLength = wallArray[i][wallArray[i].length - 1].dist;
+        const angle = rayAngleArray[i];
         ctx.moveTo(playerXOnMinimap, playerYOnMinimap);
-        ctx.lineTo(playerXOnMinimap + pixel * thisRayLength * Math.cos(i), playerYOnMinimap + pixel * thisRayLength * Math.sin(i));
-        ctx.stroke();
-    });
+        ctx.lineTo(playerXOnMinimap + pixel * thisRayLength * Math.cos(angle), playerYOnMinimap + pixel * thisRayLength * Math.sin(angle));
+    }
+    ctx.stroke();
     // direction pointer
     ctx.strokeStyle = "black";
     ctx.beginPath();
@@ -579,18 +572,18 @@ Game.prototype.drawMinimap = function() {
     ctx.lineTo(playerXOnMinimap + pixel * Math.cos(this.mainPlayer.alpha), playerYOnMinimap + pixel * Math.sin(this.mainPlayer.alpha));
     ctx.stroke();
     // grid
+    ctx.strokeStyle = "rgba(255,255,0,0.1)";
+    ctx.beginPath();
     for (let i = 0; i <= mapGridSize; i++) {
         const
             start = i * pixel + miniMapMargin,
             end = mapGridSize * pixel + miniMapMargin;
-        ctx.strokeStyle = "rgba(0,150,0,0.1)";
-        ctx.beginPath();
         ctx.moveTo(miniMapMargin, start);
         ctx.lineTo(end, start);
         ctx.moveTo(start, miniMapMargin);
         ctx.lineTo(start, end);
-        ctx.stroke();
     }
+    ctx.stroke();
 };
 Game.prototype.attachEventListeners = function() {
     const player = this.mainPlayer;
@@ -667,7 +660,6 @@ Game.prototype.respawnFrame = function() {
         if (timeDiff < 2500) {
             ctx.fillStyle = 'rgba(0,0,0,0.1)';
             ctx.fillRect(0, 0, width, height);
-            ctx.fill();
             //
             ctx.font = '700 36px Roboto';
             ctx.fillStyle = "rgb(255, 255, 255)";
@@ -676,7 +668,6 @@ Game.prototype.respawnFrame = function() {
         } else {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
             ctx.fillRect(0, 0, width, height);
-            ctx.fill();
             //
             ctx.font = '700 36px Roboto';
             ctx.fillStyle = "rgb(0, 0, 0)";

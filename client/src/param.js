@@ -94,8 +94,8 @@ let Param;
             order: '4',
             description: 'mid building',
             height: 7,
-            color: 'rgb(121, 55, 39)',
-            shade: 'rgb(140, 71, 54)',
+            color: 'rgb(140, 71, 54)',
+            shade: 'rgb(121, 55, 39)',
             texture: 'brickWall'
         },
         {
@@ -134,8 +134,8 @@ let Param;
             order: '9',
             description: 'jeep',
             height: 3,
-            color: 'rgb(112, 130, 56)',
-            shade: 'rgb(138, 154, 91)',
+            color: 'rgb(138, 154, 91)',
+            shade: 'rgb(112, 130, 56)',
             texture: 'brickWall'
         },
     ];

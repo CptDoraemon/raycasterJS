@@ -89,8 +89,7 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
                     state.healthPoint = 0;
                     state.killedBy = mainPlayerObj.hitBy[i];
                     state.updateServerMessage('You were killed by ' + mainPlayerObj.hitBy[i]);
-                    const hpEl = document.getElementById('playerStatusHealthPoint');
-                    hpEl.innerHTML = state.healthPoint;
+                    state.updateText('playerStatusHealthPoint', state.healthPoint);
                     //
                     setTimeout(() => {
                         state.damageIndicator = [];
@@ -100,8 +99,7 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
                 } else {
                     state.damageIndicator.push(mainPlayerObj.hitBy[i]);
                     state.healthPoint = hpAfterDamage;
-                    const hpEl = document.getElementById('playerStatusHealthPoint');
-                    hpEl.innerHTML = state.healthPoint;
+                    state.updateText('playerStatusHealthPoint', state.healthPoint);
                 }
             }
         }
