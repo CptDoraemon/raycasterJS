@@ -1,7 +1,7 @@
 import { param } from "./param";
 import { state } from "./state";
 import { CONST } from "./globalvar";
-import { game } from "./game";
+//import { game } from "./game";
 
 function Player() {
     this.isCT = (Math.random() > 0.5);
@@ -112,8 +112,8 @@ Player.prototype.move = function() {
                 totalMagzineTextEl.style.color = red;
             }
             // update text
-            state.updateText('playerStatusCurrentMagzine', state.currentMagzine);
-            state.updateText('playerStatusTotalMagzine', state.totalMagzine);
+            currentMagzineTextEl.firstChild.nodeValue = state.currentMagzine;
+            totalMagzineTextEl.firstChild.nodeValue = state.totalMagzine;
             state.isReloading = false;
             state.isReloadRequested = false;
         }, 1000)
@@ -228,7 +228,7 @@ Player.prototype.move = function() {
                 }
             }
             // update text
-            state.updateText('playerStatusCurrentMagzine', state.currentMagzine);
+            document.getElementById('playerStatusCurrentMagzine').firstChild.nodeValue = state.currentMagzine;
             setTimeout(() => {
                 state.thisRoundFiringFinished = true;
             }, 100);

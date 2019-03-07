@@ -1,13 +1,13 @@
 import { state } from "./state";
-import { game } from "./game";
+//import { game } from "./game";
 
 function ServerConnection() {
     this.ws = null;
 }
 ServerConnection.prototype.initiateConnection = function() {
-    const HOST = location.hostname !== 'localhost' ? location.origin.replace(/^http/, 'ws') : 'ws://localhost:5000/';
-    const ws = new WebSocket(HOST);
-    //const ws = new WebSocket('ws://192.168.100.156:5000/');
+    // const HOST = location.hostname !== 'localhost' ? location.origin.replace(/^http/, 'ws') : 'ws://localhost:5000/';
+    // const ws = new WebSocket(HOST);
+    const ws = new WebSocket('ws://192.168.100.156:5000/');
     this.ws = ws;
 
     ws.onopen = function() {
@@ -89,7 +89,7 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
                     state.healthPoint = 0;
                     state.killedBy = mainPlayerObj.hitBy[i];
                     state.updateServerMessage('You were killed by ' + mainPlayerObj.hitBy[i]);
-                    state.updateText('playerStatusHealthPoint', state.healthPoint);
+                    document.getElementById('playerStatusHealthPoint').firstChild.nodeValue = state.healthPoint;
                     //
                     setTimeout(() => {
                         state.damageIndicator = [];
@@ -99,7 +99,7 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
                 } else {
                     state.damageIndicator.push(mainPlayerObj.hitBy[i]);
                     state.healthPoint = hpAfterDamage;
-                    state.updateText('playerStatusHealthPoint', state.healthPoint);
+                    document.getElementById('playerStatusHealthPoint').firstChild.nodeValue = state.healthPoint;
                 }
             }
         }

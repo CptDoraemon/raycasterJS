@@ -1,5 +1,4 @@
-import { game } from "./game";
-import { serverConnection } from "./serverconnection";
+import { Game } from "./game";
 import { CONST } from "./globalvar";
 
 
@@ -84,13 +83,7 @@ Loading.prototype.drawLoadingPage = function() {
 
         // update text
         if (displayingPercentage + 1 <= loadingPercentage) {
-            displayingPercentage++;
-            const el = loadingPercentageSpan;
-            while (loadingPercentageSpan.lastChild) {
-                loadingPercentageSpan.removeChild(loadingPercentageSpan.lastChild)
-            }
-            const newText = document.createTextNode(displayingPercentage);
-            loadingPercentageSpan.appendChild(newText);
+            loadingPercentageSpan.firstChild.nodeValue = ++displayingPercentage;
         }
 
         // change text color to white once loaded > 50%
@@ -116,6 +109,7 @@ Loading.prototype.drawLoadingPage = function() {
     requestAnimationFrame(frame);
 };
 Loading.prototype.finishLoading = function() {
+    window.game = new Game();
     game.play();
     const
         loadingCanvas = document.getElementById('loadingCanvas'),

@@ -158,15 +158,15 @@ State.prototype.getGunPostion = function() {
         gunHeight = 0.4*height;
     return [gunPosStartX, gunPosStartY, gunWidth, gunHeight]
 };
-State.prototype.updateText = function(elId, updatedText) {
-    let
-        el = document.getElementById(elId),
-        textNode = document.createTextNode(updatedText);
-    for (let c = el.firstChild; c !== null; c = el.firstChild) {
-        el.removeChild(c)
-    }
-    el.appendChild(textNode);
-};
+// State.prototype.updateText = function(elId, updatedText) {
+//     let
+//         el = document.getElementById(elId),
+//         textNode = document.createTextNode(updatedText);
+//     for (let c = el.firstChild; c !== null; c = el.firstChild) {
+//         el.removeChild(c)
+//     }
+//     el.appendChild(textNode);
+// };
 
 const state = new State();
 

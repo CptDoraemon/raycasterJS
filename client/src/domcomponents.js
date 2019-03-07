@@ -1,7 +1,7 @@
 import { state } from "./state";
 
 function InstructionComponent() {
-    this.component;
+    this.component = null;
     this.isDisplaying = true;
 }
 InstructionComponent.prototype.mountComponent = function() {
@@ -160,7 +160,7 @@ PlayerStatusComponent.prototype.mountComponent = function() {
 };
 
 function ServerMessageComponent() {
-    this.component;
+    this.component = null;
     this.itemWrapperClass = 'serverMessageItemWrapper';
 }
 ServerMessageComponent.prototype.mountComponent = function() {
@@ -172,14 +172,14 @@ ServerMessageComponent.prototype.mountComponent = function() {
 };
 
 function ScoreBoardComponent() {
-    this.component;
+    this.component = null;
     this.isDisplaying = false;
     this.rowClassName = 'scoreBoardRow';
     this.rowTitleClassName = 'scoreBoardRowTitle scoreBoardRow';
     this.rowHighlightClassName = 'scoreBoardRow scoreBoardRowHighlight';
     this.rowItemClassName = 'scoreBoardRowItem';
 
-    this.timeInterval;
+    this.timeInterval = null;
 }
 ScoreBoardComponent.prototype.mountComponent = function() {
     const rootDiv = document.getElementById('root');
@@ -221,7 +221,7 @@ ScoreBoardComponent.prototype.updateData = function() {
     if (this.isDisplaying) {
         // sort state.playersArray
         const playersArray = state.playersArray.slice();
-        playersArray.sort((a, b) => b.kill - a.kill)
+        playersArray.sort((a, b) => b.kill - a.kill);
 
         // components
         const playerId = state.playerId;

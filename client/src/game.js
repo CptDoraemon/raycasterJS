@@ -713,6 +713,6 @@ Game.prototype.play = function() {
     requestAnimationFrame(this.frame);
 };
 
-const game = new Game();
+//const game = new Game();
 
-export { game };
+export { Game };
