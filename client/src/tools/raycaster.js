@@ -1,4 +1,3 @@
-import { param } from "../param";
 
 function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
     // input origin x,y and angle alpha, return distance.

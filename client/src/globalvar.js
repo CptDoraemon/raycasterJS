@@ -27,5 +27,4 @@ let GlobalVar;
     };
 })();
 
-const CONST = new GlobalVar();
-export { CONST };
+export { GlobalVar };

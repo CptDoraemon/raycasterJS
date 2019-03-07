@@ -1,9 +1,5 @@
-import { param } from "./param";
-import { CONST } from "./globalvar";
 import { InstructionComponent, ToolBarComponent, PlayerStatusComponent, ServerMessageComponent, ScoreBoardComponent } from "./domcomponents";
-import { state } from "./state";
 import { Player } from "./player";
-import { serverConnection } from "./serverconnection";
 import { raycaster } from "./tools/raycaster";
 import { remapAngleToZeroToTwoPI } from "./tools/ptopcalc";
 
@@ -20,11 +16,11 @@ function Game() {
     this.deathTimeStamp = null; // used in respawn frame
     this.respawnFramethrottler = 1;
     //
-    this.miniMapSizeMax = param.getMiniMapSizeMax();
-    this.miniMapSizeMin = param.getMiniMapSizeMin();
+    this.miniMapSizeMax = param.miniMapSizeMax;
+    this.miniMapSizeMin = param.miniMapSizeMin;
     this.miniMapSize = this.miniMapSizeMin;
-    this.miniMapMargin = param.getMiniMapMargin();
-    this.miniMapToggleSpeed = param.getMiniMapToggleSpeed();
+    this.miniMapMargin = param.miniMapMargin;
+    this.miniMapToggleSpeed = param.miniMapToggleSpeed;
 }
 Game.prototype.initiateCanvas = function() {
     const rootDiv = document.getElementById('root');
@@ -703,9 +699,9 @@ Game.prototype.frame = function() {
     }
 };
 Game.prototype.play = function() {
-    game.initiateCanvas();
-    game.createMainPlayer();
-    game.attachEventListeners();
+    this.initiateCanvas();
+    this.createMainPlayer();
+    this.attachEventListeners();
     serverConnection.initiateConnection();
 
     this.respawnFrame = this.respawnFrame.bind(this);
@@ -713,6 +709,5 @@ Game.prototype.play = function() {
     requestAnimationFrame(this.frame);
 };
 
-//const game = new Game();
 
 export { Game };

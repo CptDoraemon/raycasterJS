@@ -1,13 +1,10 @@
-import { state } from "./state";
-//import { game } from "./game";
 
 function ServerConnection() {
     this.ws = null;
 }
 ServerConnection.prototype.initiateConnection = function() {
-    // const HOST = location.hostname !== 'localhost' ? location.origin.replace(/^http/, 'ws') : 'ws://localhost:5000/';
-    // const ws = new WebSocket(HOST);
-    const ws = new WebSocket('ws://192.168.100.156:5000/');
+    const HOST = location.hostname.slice(0, 3) !== '192' ? location.origin.replace(/^http/, 'ws') : 'ws://192.168.100.156:5000/';
+    const ws = new WebSocket(HOST);
     this.ws = ws;
 
     ws.onopen = function() {
@@ -111,6 +108,5 @@ ServerConnection.prototype.handleDownLinkUpdatePosition = function(received) {
     }
 };
 
-const serverConnection = new ServerConnection();
 
-export  { serverConnection };
+export  { ServerConnection };

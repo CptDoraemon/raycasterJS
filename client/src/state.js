@@ -1,5 +1,3 @@
-import { CONST } from "./globalvar";
-import { param } from "./param";
 
 function State() {
     // states
@@ -164,6 +162,5 @@ State.prototype.getGunPostion = function() {
 //     el.appendChild(textNode);
 // };
 
-const state = new State();
 
-export { state };
+export { State };

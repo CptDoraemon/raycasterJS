@@ -1,6 +1,3 @@
-import { Game } from "./game";
-import { CONST } from "./globalvar";
-
 
 function Loading() {
     this.loaded = 0;
@@ -109,7 +106,6 @@ Loading.prototype.drawLoadingPage = function() {
     requestAnimationFrame(frame);
 };
 Loading.prototype.finishLoading = function() {
-    window.game = new Game();
     game.play();
     const
         loadingCanvas = document.getElementById('loadingCanvas'),

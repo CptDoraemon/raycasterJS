@@ -1,7 +1,3 @@
-import { param } from "./param";
-import { state } from "./state";
-import { CONST } from "./globalvar";
-//import { game } from "./game";
 
 function Player() {
     this.isCT = (Math.random() > 0.5);

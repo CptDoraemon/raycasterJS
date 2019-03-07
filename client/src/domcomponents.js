@@ -1,4 +1,3 @@
-import { state } from "./state";
 
 function InstructionComponent() {
     this.component = null;
