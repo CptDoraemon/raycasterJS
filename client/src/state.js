@@ -77,32 +77,28 @@ function State() {
 State.prototype.updateServerMessage = function(newMessage) {
     if (this.serverMessageTimeout) clearTimeout(this.serverMessageTimeout);
     //
-    const
-        array = this.serverMessage.slice(),
-        serverMessageComponent = document.getElementById('serverMessageComponent');
+    const serverMessageComponent = document.getElementById('serverMessageComponent');
     serverMessageComponent.style.opacity = 1;
     let
-        innerComponent = '',
         date = new Date(),
         hour = date.getHours() < 10 ? '0' + date.getHours() : date.getHours(),
         minute = date.getMinutes() < 10 ? '0' + date.getMinutes() : date.getMinutes(),
         second = date.getSeconds() < 10 ? '0' + date.getSeconds() : date.getSeconds();
-    if (array.length === 5) {
-        array.shift()
-    }
 
     date = hour + ':' + minute + ':' + second;
     newMessage = date + ' ' + '-' + ' ' + newMessage;
-    array.push(newMessage);
-    array.map(msg => {
-        innerComponent += '<div class="serverMessageItemWrapper">' + msg + '</div>';
-    });
-    // innerHtml = '' doesn't remove node, lastChild is faster than firstChild
-    while(serverMessageComponent.lastChild) {
-        serverMessageComponent.removeChild(serverMessageComponent.lastChild);
-    };
-    serverMessageComponent.innerHTML = innerComponent;
-    this.serverMessage = array;
+
+
+    const textNode = document.createTextNode(newMessage);
+    const container = document.createElement('div');
+    container.className = 'serverMessageItemWrapper';
+    container.appendChild(textNode);
+    serverMessageComponent.appendChild(container);
+
+    this.serverMessage.push(newMessage);
+    if (this.serverMessage.length > 5) {
+        serverMessageComponent.removeChild(serverMessageComponent.firstChild);
+    }
 
     this.serverMessageTimeout = setTimeout(() => {
         serverMessageComponent.style.opacity = 0;
