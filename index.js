@@ -13,7 +13,7 @@ if( process.env.PORT ) {
 }
 
 const WebSocket = require('ws');
-const http = require("https");
+const http = require("http");
 const server = http.createServer(app);
 server.listen(port);
 const wss = new WebSocket.Server({ server: server });
