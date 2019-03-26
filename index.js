@@ -4,9 +4,16 @@ const bodyParser = require('body-parser');
 
 const app = express();
 const port = process.env.PORT || 5000;
-//app.listen(port);
+if( process.env.PORT ) {
+    app.use((req, res, next) => {
+        if (req.header('X-Forwarded-Proto') === 'https') {
+            next();
+        } else res.redirect('https://' + req.hostname + req.url);
+    });
+}
+
 const WebSocket = require('ws');
-const http = require("http");
+const http = require("https");
 const server = http.createServer(app);
 server.listen(port);
 const wss = new WebSocket.Server({ server: server });
