@@ -13,10 +13,6 @@ window.game = new Game();
 window.serverConnection = new ServerConnection();
 
 
-// init objects
-const
-    loading = new Loading();
-
 
 window.onload = function() {
     const loading = new Loading();

@@ -4,6 +4,7 @@ function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
     //
     const playerHeight = 1;
     const halfYFov = 0.5 * param.fovY;
+    const halfXFov = 0.5 * param.fovX;
     //
     const
         mapWidth = param.getMapGrid()[0].length,
@@ -34,10 +35,13 @@ function raycaster(x, y, alpha, pointerAlpha, accumulatedJumpHeight) {
         const
             sightHeightAboveHorizon = playerHeight + accumulatedJumpHeight + obj.distFishEyeCorrected * Math.tan(halfYFov),
             sightHeight = 2 * obj.distFishEyeCorrected * Math.tan(halfYFov),
+            sightWidth = 2 * obj.distFishEyeCorrected * Math.tan(halfXFov),
             wallHeight = param.getWallTypeInfo()[obj.wallType].height;
         obj.wallStartYOnScreenPercent = Math.max(0, sightHeightAboveHorizon - wallHeight) / sightHeight;
         obj.wallEndYOnScreenPercent = sightHeightAboveHorizon / sightHeight;
         obj.textureYOffset = Math.max(0, wallHeight - sightHeightAboveHorizon) / wallHeight;
+        obj.sightPlaneWidth = sightWidth;
+        obj.sightPlaneHeight = sightHeight;
     });
     return hitCoordinateFiltered;
 }

@@ -87,15 +87,15 @@ function handleUpLinkUpdatePosition(message, ws, wss) {
 	const playersArray = state.playersArray.slice();
 	playersArray.map((obj) => {
 		if (obj.playerId === whoSentMessage) {
-			obj.x = payload.x,
-			obj.y = payload.y,
-			obj.accumulatedJumpHeight = payload.accumulatedJumpHeight,
-			obj.healthPoint = payload.healthPoint,
-			obj.death = payload.death,
-			obj.latency = payload.latency,
-			obj.timeSent = payload.timeSent,
-			obj.isRespawning = payload.isRespawning,
-			obj.lastCommunicated = new Date()
+			obj.x = payload.x;
+			obj.y = payload.y;
+			obj.accumulatedJumpHeight = payload.accumulatedJumpHeight;
+			obj.healthPoint = payload.healthPoint;
+			obj.death = payload.death;
+			obj.latency = payload.latency;
+			obj.timeSent = payload.timeSent;
+			obj.isRespawning = payload.isRespawning;
+			obj.lastCommunicated = new Date();
 
 			isModified++;
 		}

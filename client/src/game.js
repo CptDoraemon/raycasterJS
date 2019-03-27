@@ -122,19 +122,43 @@ Game.prototype.drawFrame = function() {
                 const
                     texture = document.getElementById(wallInfo.texture),
                     offset = obj.hitDirection === 0 ? obj.x - Math.floor(obj.x) : obj.y - Math.floor(obj.y),
-                    sourceX = offset * texture.width,
-                    sourceWidthInOneColumn = resolution / CONST.getWindowWidth() * texture.width,
-                    sourceWidth = sourceX + sourceWidthInOneColumn > texture.width ? texture.width - sourceX : sourceWidthInOneColumn;
+                    sourceX = Math.floor(offset * texture.width),
+                    sourceWidthInOneColumn = Math.max(0.1, resolution / CONST.getWindowWidth() * obj.sightPlaneWidth);
+                // consider the connecting edge of texture
+                if (sourceX + sourceWidthInOneColumn <= texture.width) {
                     ctx.drawImage(
                         texture,
                         sourceX,
                         obj.textureYOffset * texture.height,
-                        sourceWidth,
+                        sourceWidthInOneColumn,
                         (1 - obj.textureYOffset) * texture.height,
                         index * resolution,
                         wallStart,
                         resolution,
                         wallEnd - wallStart);
+                } else {
+                    const firstPartTexture = texture.width - sourceX;
+                    ctx.drawImage(
+                        texture,
+                        sourceX,
+                        obj.textureYOffset * texture.height,
+                        firstPartTexture,
+                        (1 - obj.textureYOffset) * texture.height,
+                        index * resolution,
+                        wallStart,
+                        resolution,
+                        wallEnd - wallStart);
+                    ctx.drawImage(
+                        texture,
+                        0,
+                        obj.textureYOffset * texture.height,
+                        sourceWidthInOneColumn - firstPartTexture,
+                        (1 - obj.textureYOffset) * texture.height,
+                        index * resolution,
+                        wallStart,
+                        resolution,
+                        wallEnd - wallStart);
+                }
                 // shade
                 if (obj.hitDirection === 1) {
                     ctx.fillStyle = 'rgba(0,0,0,0.3)';
